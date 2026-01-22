@@ -54,6 +54,60 @@
     build: {
       target: 'esnext',
       outDir: 'build',
+      rollupOptions: {
+        output: {
+          manualChunks(id) {
+            if (id.includes('node_modules')) {
+              // Core React ecosystem
+              if (id.includes('/node_modules/react/') || 
+                  id.includes('/node_modules/react-dom/') || 
+                  id.includes('/node_modules/react-router-dom/') ||
+                  id.includes('/node_modules/scheduler/')) {
+                return 'react-vendor';
+              }
+
+              // UI Libraries
+              if (id.includes('/node_modules/recharts/')) {
+                return 'recharts';
+              }
+              if (id.includes('/node_modules/lucide-react/')) {
+                return 'lucide';
+              }
+              if (id.includes('/node_modules/@radix-ui/')) {
+                return 'radix-ui';
+              }
+              if (id.includes('/node_modules/@supabase/')) {
+                return 'supabase';
+              }
+              
+              // Utilities
+              if (id.includes('/node_modules/lodash/')) {
+                return 'lodash';
+              }
+              if (id.includes('/node_modules/date-fns/')) {
+                return 'date-fns';
+              }
+
+              // PDF and Export Tools
+              if (id.includes('/node_modules/pdfjs-dist/')) {
+                return 'pdfjs';
+              }
+              if (id.includes('/node_modules/jspdf/')) {
+                return 'jspdf';
+              }
+              if (id.includes('/node_modules/html2canvas/')) {
+                return 'html2canvas';
+              }
+              if (id.includes('/node_modules/xlsx/')) {
+                return 'xlsx';
+              }
+              
+              return 'vendor';
+            }
+          }
+        }
+      },
+      chunkSizeWarningLimit: 1000,
     },
     server: {
       port: 3000,
