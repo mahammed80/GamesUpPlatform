@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { TrendingUp, Download, Calendar } from 'lucide-react';
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import { Card } from '../ui/Card';
-import { Button } from '../ui/Button';
+import { Card } from '../ui/card';
+import { Button } from '../ui/button';
 import { useStoreSettings } from '../../context/StoreSettingsContext';
 
 const revenueData = [

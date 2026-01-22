@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Search, Eye, Download, FileText, Printer, X } from 'lucide-react';
-import { Card } from '../ui/Card';
+import { Card } from '../ui/card';
 import { ordersAPI } from '../../utils/api';
 import { useStoreSettings } from '../../context/StoreSettingsContext';
 import { QuickEditCell } from '../ui/QuickEditCell';

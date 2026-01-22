@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Search, Star, Mail, Phone, MapPin, X } from 'lucide-react';
-import { Card } from '../ui/Card';
+import { Card } from '../ui/card';
 import { customersAPI } from '../../utils/api';
 import { useStoreSettings } from '../../context/StoreSettingsContext';
 

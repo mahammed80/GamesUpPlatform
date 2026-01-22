@@ -1,7 +1,7 @@
 import { TrendingUp, TrendingDown, DollarSign, ShoppingCart, Users, Percent, Globe } from 'lucide-react';
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { KPICard } from '../ui/KPICard';
-import { Card } from '../ui/Card';
+import { Card } from '../ui/card';
 import { useStoreSettings } from '../../context/StoreSettingsContext';
 
 const salesData = [

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Plus, Edit2, Trash2, Save, X, Tag, FolderTree, Settings as SettingsIcon } from 'lucide-react';
-import { Card } from '../ui/Card';
-import { Button } from '../ui/Button';
+import { Card } from '../ui/card';
+import { Button } from '../ui/button';
 import { Modal } from '../ui/Modal';
 import { Toast } from '../ui/Toast';
 import { publicAnonKey } from '../../utils/supabase/info';

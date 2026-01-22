@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Search, Plus, Minus, Trash2, Printer, ShoppingCart, X } from 'lucide-react';
-import { Card } from '../ui/Card';
-import { Button } from '../ui/Button';
+import { Card } from '../ui/card';
+import { Button } from '../ui/button';
 import { productsAPI, posAPI } from '../../utils/api';
 import { useStoreSettings } from '../../context/StoreSettingsContext';
 

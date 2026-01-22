@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Search, Copy, Check } from 'lucide-react';
-import { Card } from '../ui/Card';
+import { Card } from '../ui/card';
 import { adminAPI } from '../../utils/api';
 import { useStoreSettings } from '../../context/StoreSettingsContext';
 
