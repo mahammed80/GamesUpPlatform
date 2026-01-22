@@ -1,0 +1,82 @@
+
+CREATE TABLE IF NOT EXISTS products (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  name VARCHAR(255) NOT NULL,
+  category_slug VARCHAR(100),
+  price DECIMAL(10, 2),
+  stock INT DEFAULT 0,
+  image VARCHAR(255),
+  description TEXT,
+  digital_items JSON,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS users (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  email VARCHAR(255) UNIQUE NOT NULL,
+  password_hash VARCHAR(255) NOT NULL,
+  name VARCHAR(255),
+  role VARCHAR(50) DEFAULT 'user',
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS customers (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  email VARCHAR(255) UNIQUE NOT NULL,
+  password_hash VARCHAR(255) NOT NULL,
+  name VARCHAR(255),
+  phone VARCHAR(50),
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS orders (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  order_number VARCHAR(50) NOT NULL,
+  customer_name VARCHAR(255) NOT NULL,
+  customer_email VARCHAR(255),
+  product_name VARCHAR(255),
+  date DATE,
+  status VARCHAR(50),
+  amount DECIMAL(10, 2),
+  digital_email VARCHAR(255),
+  digital_password VARCHAR(255),
+  digital_code VARCHAR(255),
+  inventory_id VARCHAR(50),
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS employees (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  name VARCHAR(255) NOT NULL,
+  role VARCHAR(100),
+  department VARCHAR(100),
+  email VARCHAR(255) UNIQUE,
+  phone VARCHAR(50),
+  status VARCHAR(50) DEFAULT 'Active',
+  join_date DATE,
+  salary DECIMAL(10, 2),
+  image VARCHAR(255),
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS attendance (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  employee_id INT,
+  date DATE,
+  check_in TIME,
+  check_out TIME,
+  status VARCHAR(50),
+  FOREIGN KEY (employee_id) REFERENCES employees(id)
+);
+
+CREATE TABLE IF NOT EXISTS banners (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  title VARCHAR(255) NOT NULL,
+  image_url VARCHAR(255) NOT NULL,
+  link VARCHAR(255),
+  position INT DEFAULT 0,
+  is_active BOOLEAN DEFAULT TRUE,
+  start_date DATE,
+  end_date DATE,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
