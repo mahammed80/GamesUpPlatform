@@ -41,6 +41,8 @@ This guide covers how to deploy the **GamesUp Platform** as a single Node.js app
 5.  **Build Settings**:
     *   **Build Command**: `npm install && npm run build`
         *   *This installs dependencies for both frontend and backend and builds the Vite frontend.*
+    *   **Output Directory**: `dist` (or `./dist`)
+        *   *Important: Set this to tell Hostinger where the built files are located.*
     *   **Start Command**: `npm start`
 6.  **Environment Variables**:
     *   Add the following variables in the Hostinger Dashboard:
@@ -64,7 +66,15 @@ This guide covers how to deploy the **GamesUp Platform** as a single Node.js app
 
 ## Troubleshooting
 
+### "No output directory found after build"
+This error occurs in Hostinger's deployment system (not Vite). Solutions:
+1.  **Set Output Directory**: In hPanel > Deployments > Settings, set **Output Directory** to `dist`.
+2.  **Pre-build Upload**: Build locally (`npm run build`), commit the `dist/` folder, and push to Git. Set Build Command to empty in hPanel.
+3.  **Verify Application Root**: Ensure it points to the project root, not `/server`.
+
+### Other Common Issues
 *   **Build Fails**: Check the build logs. Ensure `npm install` runs successfully.
 *   **Frontend Not Loading**: Ensure `npm run build` created the `dist` folder. The server is configured to serve files from `../dist` relative to `server/index.js`.
 *   **Database Connection Refused**: Ensure you used `localhost` as `DB_HOST` and the correct username/password from Part 1.
 *   **API Errors**: Check the **Application Logs** in Hostinger.
+*   **Package Vulnerabilities**: Run `npm audit fix` locally before deploying. Consider upgrading `multer` to v2.x.
