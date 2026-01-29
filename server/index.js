@@ -16,6 +16,32 @@ const app = express();
 const port = process.env.PORT || 3001;
 const JWT_SECRET = process.env.JWT_SECRET || 'dev_secret';
 
+// Serve static files from Vite's build directory FIRST
+// In production (Hostinger), dist is at the same level as server/
+// In development, dist is one level up from server/
+const distPath = path.join(__dirname, '../dist');
+console.log('Serving static files from:', distPath);
+
+// Configure static file serving with proper MIME types
+app.use(express.static(distPath, {
+  setHeaders: (res, filePath) => {
+    // Set correct MIME types for JavaScript modules
+    if (filePath.endsWith('.js')) {
+      res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
+    } else if (filePath.endsWith('.mjs')) {
+      res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
+    } else if (filePath.endsWith('.css')) {
+      res.setHeader('Content-Type', 'text/css; charset=utf-8');
+    } else if (filePath.endsWith('.json')) {
+      res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    }
+    // Enable caching for static assets
+    if (filePath.match(/\.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$/)) {
+      res.setHeader('Cache-Control', 'public, max-age=31536000');
+    }
+  }
+}));
+
 // Middleware
 app.use(cors({
   origin: process.env.CORS_ORIGIN || '*', // Allow all by default, or restrict to specific domain in production
@@ -1382,32 +1408,6 @@ app.get(`${BASE_PATH}/admin/sold-products`, async (req, res) => {
     res.status(500).json({ error: 'Failed to fetch sold products' });
   }
 });
-
-// Serve static files from Vite's build directory
-// In production (Hostinger), dist is at the same level as server/
-// In development, dist is one level up from server/
-const distPath = path.join(__dirname, '../dist');
-console.log('Serving static files from:', distPath);
-
-// Configure static file serving with proper MIME types
-app.use(express.static(distPath, {
-  setHeaders: (res, filePath) => {
-    // Set correct MIME types for JavaScript modules
-    if (filePath.endsWith('.js')) {
-      res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
-    } else if (filePath.endsWith('.mjs')) {
-      res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
-    } else if (filePath.endsWith('.css')) {
-      res.setHeader('Content-Type', 'text/css; charset=utf-8');
-    } else if (filePath.endsWith('.json')) {
-      res.setHeader('Content-Type', 'application/json; charset=utf-8');
-    }
-    // Enable caching for static assets
-    if (filePath.match(/\.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$/)) {
-      res.setHeader('Cache-Control', 'public, max-age=31536000');
-    }
-  }
-}));
 
 // Fallback for client-side routing - serve index.html for all non-API routes
 app.get('*', (req, res) => {
