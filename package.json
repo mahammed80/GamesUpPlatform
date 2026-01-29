@@ -16,7 +16,7 @@
             "build:full": "npm install && vite build",
             "start": "node server/index.js",
             "prestart": "npm run build",
-            "postinstall": "echo 'Dependencies installed'"
+            "postinstall": "npm run build && cp -r dist server/ || xcopy /E /I dist server\\dist && echo 'Dependencies installed and build completed'"
       },
       "keywords": [
             "express",
