@@ -35,6 +35,13 @@ This guide covers how to deploy the **GamesUp Platform** as a single Node.js app
     *   **Application Mode**: Production.
     *   **Application Root**: `/` (Leave as default or root of your domain).
     *   **Application Startup File**: `server/index.js` (or leave empty if using `npm start` command).
+    
+    > [!CAUTION]
+    > **Critical**: Ensure Hostinger detects this as a **Node.js application**, NOT a React static site. If "Framework" shows "React" in deployment details, the backend won't run. You may need to:
+    > - Delete the current deployment
+    > - Create a **new Node.js app** (not React/Static)
+    > - Or manually override framework detection in advanced settings
+
 4.  **Source Code**:
     *   Click **Import from Git** (Recommended) and connect your repository.
     *   OR upload project files manually (exclude `node_modules` and `dist`).

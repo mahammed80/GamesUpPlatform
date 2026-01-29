@@ -95,9 +95,9 @@ app.post(`${BASE_PATH}/upload`, upload.single('image'), (req, res) => {
 // Example Auth Route (Placeholder)
 app.post(`${BASE_PATH}/auth/login`, async (req, res) => {
   const { email, password } = req.body;
-  
+
   console.log(`Login attempt for ${email}`);
-  
+
   try {
     const [rows] = await pool.query(`
       SELECT u.*, r.permissions 
@@ -105,7 +105,7 @@ app.post(`${BASE_PATH}/auth/login`, async (req, res) => {
       LEFT JOIN roles r ON u.role = r.name 
       WHERE u.email = ?
     `, [email]);
-    
+
     if (rows.length === 0) {
       return res.status(401).json({ error: 'Invalid email or password' });
     }
@@ -122,8 +122,8 @@ app.post(`${BASE_PATH}/auth/login`, async (req, res) => {
 
     // Generate JWT
     const token = jwt.sign(
-      { 
-        sub: user.id, 
+      {
+        sub: user.id,
         email: user.email,
         role: user.role,
         permissions: permissions,
@@ -178,7 +178,7 @@ app.post(`${BASE_PATH}/auth/login`, async (req, res) => {
 app.post(`${BASE_PATH}/customer/signup`, async (req, res) => {
   try {
     const { email, password, name, phone } = req.body;
-    
+
     // Check if user exists
     const [existing] = await pool.query('SELECT * FROM customers WHERE email = ?', [email]);
     if (existing.length > 0) {
@@ -186,7 +186,7 @@ app.post(`${BASE_PATH}/customer/signup`, async (req, res) => {
     }
 
     const passwordHash = await bcrypt.hash(password, 10);
-    
+
     const [result] = await pool.query(
       'INSERT INTO customers (email, password_hash, name, phone) VALUES (?, ?, ?, ?)',
       [email, passwordHash, name, phone]
@@ -211,7 +211,7 @@ app.post(`${BASE_PATH}/customer/signup`, async (req, res) => {
 app.post(`${BASE_PATH}/customer/login`, async (req, res) => {
   try {
     const { email, password } = req.body;
-    
+
     const [rows] = await pool.query('SELECT * FROM customers WHERE email = ?', [email]);
     if (rows.length === 0) {
       return res.status(401).json({ error: 'Invalid email or password' });
@@ -219,7 +219,7 @@ app.post(`${BASE_PATH}/customer/login`, async (req, res) => {
 
     const user = rows[0];
     const match = await bcrypt.compare(password, user.password_hash);
-    
+
     if (!match) {
       return res.status(401).json({ error: 'Invalid email or password' });
     }
@@ -263,13 +263,13 @@ app.get(`${BASE_PATH}/customer-orders`, async (req, res) => {
       WHERE o.customer_email = ? 
       ORDER BY o.date DESC
     `, [email]);
-    
+
     // Group by order_number
     const ordersMap = new Map();
 
     rows.forEach(row => {
       const orderNumber = row.order_number || `ORD-${row.id}`; // Fallback if order_number is missing
-      
+
       if (!ordersMap.has(orderNumber)) {
         ordersMap.set(orderNumber, {
           id: orderNumber,
@@ -291,7 +291,7 @@ app.get(`${BASE_PATH}/customer-orders`, async (req, res) => {
 
       const order = ordersMap.get(orderNumber);
       const price = typeof row.amount === 'string' ? parseFloat(row.amount.replace('$', '')) : row.amount;
-      
+
       order.total += price;
       order.items.push({
         name: row.product_name,
@@ -319,7 +319,7 @@ app.get(`${BASE_PATH}/delivery-options`, async (req, res) => {
   try {
     // For now, return mixed options including OTO simulation
     const otoRates = await oto.checkDelivery('Riyadh'); // Default city for general options
-    
+
     const options = [
       {
         id: 'standard',
@@ -336,7 +336,7 @@ app.get(`${BASE_PATH}/delivery-options`, async (req, res) => {
         estimatedDays: c.time
       }))
     ];
-    
+
     res.json({ deliveryOptions: options });
   } catch (e) {
     // Fallback
@@ -358,13 +358,13 @@ app.get(`${BASE_PATH}/delivery-options`, async (req, res) => {
 app.post(`${BASE_PATH}/payment/create`, async (req, res) => {
   try {
     const { orderNumber, customerName, customerEmail, total, shippingAddress, items } = req.body;
-    
+
     // Construct return URL (Frontend Callback)
     const origin = req.headers.origin || req.headers.referer || 'http://localhost:5173';
     // Remove trailing slash if present
     const baseUrl = origin.endsWith('/') ? origin.slice(0, -1) : origin;
-    const returnUrl = `${baseUrl}/checkout`; 
-    
+    const returnUrl = `${baseUrl}/checkout`;
+
     const payment = await paytabs.createPaymentPage({
       orderNumber,
       customerName,
@@ -373,7 +373,7 @@ app.post(`${BASE_PATH}/payment/create`, async (req, res) => {
       shippingAddress,
       items
     }, returnUrl);
-    
+
     res.json(payment);
   } catch (error) {
     console.error('Payment creation error:', error);
@@ -385,32 +385,32 @@ app.post(`${BASE_PATH}/payment/create`, async (req, res) => {
 app.post(`${BASE_PATH}/payment/verify`, async (req, res) => {
   try {
     const { tranRef, orderNumber } = req.body;
-    
+
     // 1. Verify Payment
     const verification = await paytabs.verifyPayment(tranRef);
-    
+
     if (verification.success) {
       // 2. Update Order Status
       await pool.query(
         'UPDATE orders SET status = ? WHERE order_number = ?',
         ['paid', orderNumber]
       );
-      
+
       // 3. Get Order Details for Shipment
       // In a real app, we'd fetch from DB. Here we might need to pass details or fetch them.
       // Fetching from DB:
       const [orderRows] = await pool.query('SELECT * FROM orders WHERE order_number = ?', [orderNumber]);
       if (orderRows.length > 0) {
-         // Construct order object for OTO
-         const firstRow = orderRows[0];
-         // We need shipping address which we might not have stored fully in `orders` table in the simple schema
-         // But let's assume we can proceed or skip OTO if data missing
-         
-         // Ideally, we should have stored the full address. 
-         // For now, let's assume we can't do full OTO automation without address in DB.
-         // But we can try if we passed it in body, or just log it.
+        // Construct order object for OTO
+        const firstRow = orderRows[0];
+        // We need shipping address which we might not have stored fully in `orders` table in the simple schema
+        // But let's assume we can proceed or skip OTO if data missing
+
+        // Ideally, we should have stored the full address. 
+        // For now, let's assume we can't do full OTO automation without address in DB.
+        // But we can try if we passed it in body, or just log it.
       }
-      
+
       // Return success
       res.json({ success: true, message: 'Payment verified and order processed' });
     } else {
@@ -439,15 +439,15 @@ app.get(`${BASE_PATH}/products`, async (req, res) => {
     }
 
     const [rows] = await pool.query(query, params);
-    
+
     // Transform data to match frontend expectations
     const products = rows.map(product => {
       let digitalItems = [];
       let attributes = {};
-      
+
       try {
-        digitalItems = typeof product.digital_items === 'string' 
-          ? JSON.parse(product.digital_items) 
+        digitalItems = typeof product.digital_items === 'string'
+          ? JSON.parse(product.digital_items)
           : (product.digital_items || []);
       } catch (e) {
         digitalItems = [];
@@ -489,7 +489,7 @@ app.get(`${BASE_PATH}/products`, async (req, res) => {
 app.post(`${BASE_PATH}/products`, async (req, res) => {
   try {
     const { name, category, subCategory, price, cost, stock, image, description, attributes, digitalItems } = req.body;
-    
+
     // Clean price and cost (remove $ if present)
     const priceValue = typeof price === 'string' ? parseFloat(price.replace('$', '')) : price;
     const costValue = typeof cost === 'string' ? parseFloat(cost.replace('$', '')) : (cost || 0);
@@ -515,7 +515,7 @@ app.put(`${BASE_PATH}/products/:id`, async (req, res) => {
   try {
     const { id } = req.params;
     const { name, category, subCategory, price, cost, stock, image, description, attributes, digitalItems } = req.body;
-    
+
     const priceValue = typeof price === 'string' ? parseFloat(price.replace('$', '')) : price;
     const costValue = typeof cost === 'string' ? parseFloat(cost.replace('$', '')) : (cost || 0);
     const categorySlug = category ? category.toLowerCase() : 'games';
@@ -566,12 +566,12 @@ app.get(`${BASE_PATH}/settings`, async (req, res) => {
       acc[row.setting_key] = row.setting_value;
       return acc;
     }, {});
-    
+
     // Ensure default values if empty
     if (!settings.currency_code) settings.currency_code = 'USD';
     if (!settings.currency_symbol) settings.currency_symbol = '$';
     if (!settings.tax_rate) settings.tax_rate = '8.5';
-    
+
     res.json(settings);
   } catch (error) {
     console.error('Error fetching settings:', error);
@@ -631,7 +631,7 @@ app.get(`${BASE_PATH}/orders`, async (req, res) => {
     query += ' ORDER BY date DESC';
 
     const [rows] = await pool.query(query, params);
-    
+
     // Transform to match frontend expectations if needed, but schema matches closely
     const orders = rows.map(order => ({
       id: order.id, // Primary key
@@ -663,7 +663,7 @@ app.put(`${BASE_PATH}/orders/:id`, async (req, res) => {
   try {
     const { id } = req.params; // Primary key
     const { customer, email, product, digital_email, digital_password, digital_code, inventory_id, status } = req.body;
-    
+
     // Construct update query dynamically
     let query = 'UPDATE orders SET ';
     const params = [];
@@ -686,7 +686,7 @@ app.put(`${BASE_PATH}/orders/:id`, async (req, res) => {
     params.push(id);
 
     await pool.query(query, params);
-    
+
     res.json({ message: 'Order updated successfully' });
   } catch (error) {
     console.error('Error updating order:', error);
@@ -770,33 +770,33 @@ app.get(`${BASE_PATH}/system/subcategories`, async (req, res) => {
 });
 
 app.post(`${BASE_PATH}/system/subcategories`, async (req, res) => {
-   try {
-     const { categoryId, name, description, slug, displayOrder, isActive } = req.body;
-     await pool.query(
-       'INSERT INTO sub_categories (category_id, name, description, slug, display_order, is_active) VALUES (?, ?, ?, ?, ?, ?)',
-       [categoryId, name, description, slug, displayOrder || 0, isActive]
-     );
-     res.json({ message: 'Sub-category created successfully' });
-   } catch (error) {
-     console.error('Error creating sub-category:', error);
-     res.status(500).json({ error: 'Failed to create sub-category' });
-   }
- });
+  try {
+    const { categoryId, name, description, slug, displayOrder, isActive } = req.body;
+    await pool.query(
+      'INSERT INTO sub_categories (category_id, name, description, slug, display_order, is_active) VALUES (?, ?, ?, ?, ?, ?)',
+      [categoryId, name, description, slug, displayOrder || 0, isActive]
+    );
+    res.json({ message: 'Sub-category created successfully' });
+  } catch (error) {
+    console.error('Error creating sub-category:', error);
+    res.status(500).json({ error: 'Failed to create sub-category' });
+  }
+});
 
- app.put(`${BASE_PATH}/system/subcategories/:id`, async (req, res) => {
-   try {
-     const { id } = req.params;
-     const { categoryId, name, description, slug, displayOrder, isActive } = req.body;
-     await pool.query(
-       'UPDATE sub_categories SET category_id=?, name=?, description=?, slug=?, display_order=?, is_active=? WHERE id=?',
-       [categoryId, name, description, slug, displayOrder, isActive, id]
-     );
-     res.json({ message: 'Sub-category updated successfully' });
-   } catch (error) {
-     console.error('Error updating sub-category:', error);
-     res.status(500).json({ error: 'Failed to update sub-category' });
-   }
- });
+app.put(`${BASE_PATH}/system/subcategories/:id`, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { categoryId, name, description, slug, displayOrder, isActive } = req.body;
+    await pool.query(
+      'UPDATE sub_categories SET category_id=?, name=?, description=?, slug=?, display_order=?, is_active=? WHERE id=?',
+      [categoryId, name, description, slug, displayOrder, isActive, id]
+    );
+    res.json({ message: 'Sub-category updated successfully' });
+  } catch (error) {
+    console.error('Error updating sub-category:', error);
+    res.status(500).json({ error: 'Failed to update sub-category' });
+  }
+});
 
 app.delete(`${BASE_PATH}/system/subcategories/:id`, async (req, res) => {
   try {
@@ -891,7 +891,7 @@ app.get(`${BASE_PATH}/public/products`, async (req, res) => {
     }
 
     const [rows] = await pool.query(query, params);
-    
+
     // Transform data to match POS expectations (price as number)
     const products = rows.map(product => {
       let attributes = {};
@@ -940,7 +940,7 @@ app.get(`${BASE_PATH}/banners`, async (req, res) => {
   } catch (error) {
     // Return empty array if table doesn't exist or other error, to prevent frontend crash
     console.error('Error fetching banners:', error);
-    res.json({ banners: [] }); 
+    res.json({ banners: [] });
   }
 });
 
@@ -1009,7 +1009,7 @@ app.get(`${BASE_PATH}/hr/attendance`, async (req, res) => {
 
 // Setup Accounts (Placeholder to silence frontend error)
 app.post(`${BASE_PATH}/setup-accounts`, (req, res) => {
-  res.json({ 
+  res.json({
     message: 'Accounts setup logic handled by seeders',
     credentials: {
       admin: {
@@ -1072,22 +1072,22 @@ app.get(`${BASE_PATH}/admin/users`, async (req, res) => {
 app.post(`${BASE_PATH}/admin/users`, async (req, res) => {
   try {
     const { email, password, name, role, job_title, phone, avatar, identity_document } = req.body;
-    
+
     // Check if user exists
     const [existing] = await pool.query('SELECT id FROM users WHERE email = ?', [email]);
     if (existing.length > 0) {
       return res.status(400).json({ error: 'User already exists' });
     }
-    
+
     // Hash password
     const salt = await bcrypt.genSalt(10);
     const passwordHash = await bcrypt.hash(password, salt);
-    
+
     await pool.query(
       'INSERT INTO users (email, password_hash, name, role, job_title, phone, avatar, identity_document) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
       [email, passwordHash, name, role, job_title, phone, avatar, identity_document]
     );
-    
+
     res.json({ message: 'User created successfully' });
   } catch (error) {
     console.error('Error creating user:', error);
@@ -1099,28 +1099,28 @@ app.put(`${BASE_PATH}/admin/users/:id`, async (req, res) => {
   try {
     const { id } = req.params;
     const { email, password, name, role, job_title, phone, avatar, identity_document } = req.body;
-    
+
     // Check if user exists
     const [existing] = await pool.query('SELECT id FROM users WHERE id = ?', [id]);
     if (existing.length === 0) {
       return res.status(404).json({ error: 'User not found' });
     }
-    
+
     let query = 'UPDATE users SET email = ?, name = ?, role = ?, job_title = ?, phone = ?, avatar = ?, identity_document = ?';
     let params = [email, name, role, job_title, phone, avatar, identity_document];
-    
+
     if (password) {
       const salt = await bcrypt.genSalt(10);
       const passwordHash = await bcrypt.hash(password, salt);
       query += ', password_hash = ?';
       params.push(passwordHash);
     }
-    
+
     query += ' WHERE id = ?';
     params.push(id);
-    
+
     await pool.query(query, params);
-    
+
     res.json({ message: 'User updated successfully' });
   } catch (error) {
     console.error('Error updating user:', error);
@@ -1147,12 +1147,12 @@ app.get(`${BASE_PATH}/settings`, async (req, res) => {
       acc[row.setting_key] = row.setting_value;
       return acc;
     }, {});
-    
+
     // Ensure defaults
     if (!settings.currency_code) settings.currency_code = 'USD';
     if (!settings.currency_symbol) settings.currency_symbol = '$';
     if (!settings.tax_rate) settings.tax_rate = '8.5';
-    
+
     res.json(settings);
   } catch (error) {
     console.error('Error fetching settings:', error);
@@ -1163,18 +1163,18 @@ app.get(`${BASE_PATH}/settings`, async (req, res) => {
 app.post(`${BASE_PATH}/settings`, async (req, res) => {
   try {
     const settings = req.body; // { currency_code: 'EGP', currency_symbol: 'E£', tax_rate: '10' }
-    
+
     const connection = await pool.getConnection();
     try {
       await connection.beginTransaction();
-      
+
       for (const [key, value] of Object.entries(settings)) {
         await connection.query(
           'INSERT INTO settings (setting_key, setting_value) VALUES (?, ?) ON DUPLICATE KEY UPDATE setting_value = ?',
           [key, String(value), String(value)]
         );
       }
-      
+
       await connection.commit();
       res.json({ message: 'Settings updated successfully' });
     } catch (error) {
@@ -1212,7 +1212,7 @@ app.post(`${BASE_PATH}/customer-orders`, async (req, res) => {
       for (let i = 0; i < item.quantity; i++) {
         // Fetch fresh product data to ensure concurrency safety (simplistic locking via update later)
         const [products] = await connection.query('SELECT * FROM products WHERE id = ? FOR UPDATE', [item.id]);
-        
+
         if (products.length === 0) {
           throw new Error(`Product ${item.name} not found`);
         }
@@ -1220,8 +1220,8 @@ app.post(`${BASE_PATH}/customer-orders`, async (req, res) => {
         const product = products[0];
         let digitalItems = [];
         try {
-          digitalItems = typeof product.digital_items === 'string' 
-            ? JSON.parse(product.digital_items) 
+          digitalItems = typeof product.digital_items === 'string'
+            ? JSON.parse(product.digital_items)
             : (product.digital_items || []);
         } catch (e) {
           digitalItems = [];
@@ -1240,10 +1240,10 @@ app.post(`${BASE_PATH}/customer-orders`, async (req, res) => {
 
         // Pop a digital item
         const assignedItem = digitalItems.length > 0 ? digitalItems.shift() : null;
-        
+
         // Update product
         const newStock = Math.max(0, product.stock - 1);
-        
+
         await connection.query(
           'UPDATE products SET stock = ?, digital_items = ? WHERE id = ?',
           [newStock, JSON.stringify(digitalItems), product.id]
@@ -1258,11 +1258,11 @@ app.post(`${BASE_PATH}/customer-orders`, async (req, res) => {
             payment_method, payment_proof
           ) VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), ?, ?, ?, ?, ?)`,
           [
-            orderNumber, 
-            customerName, 
-            customerEmail, 
-            product.name, 
-            item.price, 
+            orderNumber,
+            customerName,
+            customerEmail,
+            product.name,
+            item.price,
             product.cost || 0,
             status,
             assignedItem?.email || null,
@@ -1283,8 +1283,8 @@ app.post(`${BASE_PATH}/customer-orders`, async (req, res) => {
     }
 
     await connection.commit();
-    
-    res.json({ 
+
+    res.json({
       message: 'Order placed successfully',
       orderNumber,
       purchasedItems
@@ -1316,7 +1316,7 @@ app.get(`${BASE_PATH}/admin/customers`, async (req, res) => {
       GROUP BY c.id
       ORDER BY c.created_at DESC
     `);
-    
+
     const customers = rows.map(c => ({
       id: c.id,
       name: c.name,
@@ -1352,7 +1352,7 @@ app.get(`${BASE_PATH}/admin/sold-products`, async (req, res) => {
          OR digital_code IS NOT NULL
       ORDER BY date DESC
     `);
-    
+
     const soldProducts = rows.map(order => ({
       id: order.id,
       orderNumber: order.order_number,
@@ -1376,11 +1376,17 @@ app.get(`${BASE_PATH}/admin/sold-products`, async (req, res) => {
 });
 
 // Serve static files from Vite's build directory
-app.use(express.static(path.join(__dirname, '../dist')));
+// In production (Hostinger), dist is at the same level as server/
+// In development, dist is one level up from server/
+const distPath = path.join(__dirname, '../dist');
+console.log('Serving static files from:', distPath);
+app.use(express.static(distPath));
 
-// Fallback for client-side routing
+// Fallback for client-side routing - serve index.html for all non-API routes
 app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, '../dist/index.html'));
+  const indexPath = path.join(distPath, 'index.html');
+  console.log('Serving index.html from:', indexPath);
+  res.sendFile(indexPath);
 });
 
 app.listen(port, () => {
