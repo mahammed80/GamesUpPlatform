@@ -15,7 +15,8 @@
             "build": "vite build",
             "build:full": "npm install && vite build",
             "start": "node server/index.js",
-            "postinstall": "echo 'Dependencies installed successfully'"
+            "prestart": "npm run build",
+            "postinstall": "echo 'Dependencies installed'"
       },
       "keywords": [
             "express",
@@ -28,6 +29,7 @@
       "license": "ISC",
       "dependencies": {
             "@jsr/supabase__supabase-js": "^2.49.8",
+            "@mapbox/node-pre-gyp": "^2.0.3",
             "@radix-ui/react-accordion": "^1.2.3",
             "@radix-ui/react-alert-dialog": "^1.1.6",
             "@radix-ui/react-aspect-ratio": "^1.1.2",
@@ -56,7 +58,7 @@
             "@radix-ui/react-tooltip": "^1.1.8",
             "@supabase/supabase-js": "^2",
             "axios": "^1.6.0",
-            "bcrypt": "^5.1.1",
+            "bcrypt": "^6.0.0",
             "class-variance-authority": "^0.7.1",
             "clsx": "*",
             "cmdk": "^1.1.1",
@@ -71,7 +73,7 @@
             "jspdf": "^4.0.0",
             "lucide-react": "^0.487.0",
             "motion": "*",
-            "multer": "^1.4.5-lts.1",
+            "multer": "^2.0.2",
             "mysql2": "^3.6.5",
             "next-themes": "^0.4.6",
             "pg": "^8.11.3",
@@ -91,6 +93,6 @@
             "@types/node": "^20.10.0",
             "@vitejs/plugin-react-swc": "^3.10.2",
             "concurrently": "^8.2.2",
-            "vite": "6.3.5"
+            "vite": "^6.4.1"
       }
 }
