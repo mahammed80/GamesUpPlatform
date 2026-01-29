@@ -21,34 +21,58 @@ const JWT_SECRET = process.env.JWT_SECRET || 'dev_secret';
 const distPath = path.join(__dirname, 'dist');
 console.log('Serving static files from:', distPath);
 
-// Check if dist exists, if not, serve from src for development
+// Check if dist exists, if not, don't serve frontend in development
 const fs = require('fs');
 let finalDistPath = distPath;
 
 if (!fs.existsSync(distPath)) {
-  console.log('Dist directory not found, serving from src directory for development');
-  finalDistPath = path.join(__dirname, 'src');
+  console.log('Dist directory not found - frontend not available. Run "npm run build" first.');
+  // In development without build, we don't serve static files
+  // Vite dev server will handle the frontend
 }
 
-// Configure static file serving with proper MIME types
-app.use(express.static(finalDistPath, {
-  setHeaders: (res, filePath) => {
-    // Set correct MIME types for JavaScript modules
-    if (filePath.endsWith('.js')) {
-      res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
-    } else if (filePath.endsWith('.mjs')) {
-      res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
-    } else if (filePath.endsWith('.css')) {
-      res.setHeader('Content-Type', 'text/css; charset=utf-8');
-    } else if (filePath.endsWith('.json')) {
-      res.setHeader('Content-Type', 'application/json; charset=utf-8');
+// Configure static file serving with proper MIME types - only if dist exists
+if (fs.existsSync(distPath)) {
+  console.log('Static file serving enabled for:', distPath);
+  
+  // Set MIME types for JavaScript modules
+  express.static.mime.define({
+    'application/javascript': ['js', 'mjs']
+  });
+  
+  app.use(express.static(finalDistPath, {
+    setHeaders: (res, filePath) => {
+      console.log('Serving static file:', filePath);
+      // Force correct MIME types for JavaScript modules
+      if (filePath.endsWith('.js') || filePath.endsWith('.mjs')) {
+        res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
+      } else if (filePath.endsWith('.css')) {
+        res.setHeader('Content-Type', 'text/css; charset=utf-8');
+      } else if (filePath.endsWith('.json')) {
+        res.setHeader('Content-Type', 'application/json; charset=utf-8');
+      }
+      // Enable caching for static assets
+      if (filePath.match(/\.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$/)) {
+        res.setHeader('Cache-Control', 'public, max-age=31536000');
+      }
     }
-    // Enable caching for static assets
-    if (filePath.match(/\.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$/)) {
-      res.setHeader('Cache-Control', 'public, max-age=31536000');
-    }
-  }
-}));
+  }));
+} else {
+  console.log('Dist directory not found, static file serving disabled');
+}
+
+// Additional route to ensure JavaScript files get correct MIME type
+if (fs.existsSync(distPath)) {
+  app.get('*.js', (req, res, next) => {
+    res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
+    next();
+  });
+  
+  app.get('*.mjs', (req, res, next) => {
+    res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
+    next();
+  });
+}
 
 // Middleware
 app.use(cors({
@@ -1417,11 +1441,22 @@ app.get(`${BASE_PATH}/admin/sold-products`, async (req, res) => {
   }
 });
 
-// Fallback for client-side routing - serve index.html for all non-API routes
+// Fallback for client-side routing - serve index.html for all non-API routes (only if dist exists)
+// But exclude static assets to prevent serving index.html for JS/CSS files
 app.get('*', (req, res) => {
-  const indexPath = path.join(finalDistPath, 'index.html');
-  console.log('Serving index.html from:', indexPath);
-  res.sendFile(indexPath);
+  if (fs.existsSync(distPath)) {
+    // Don't serve index.html for static assets
+    const staticAssetPattern = /\.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot|json|map)$/;
+    if (staticAssetPattern.test(req.path)) {
+      return res.status(404).json({ error: 'Static asset not found' });
+    }
+    
+    const indexPath = path.join(finalDistPath, 'index.html');
+    console.log('Serving index.html from:', indexPath);
+    res.sendFile(indexPath);
+  } else {
+    res.status(404).json({ error: 'Frontend not built. Run "npm run build" first.' });
+  }
 });
 
 app.listen(port, () => {
