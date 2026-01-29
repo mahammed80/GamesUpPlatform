@@ -2,21 +2,21 @@
       "name": "gamesup-platform",
       "version": "1.0.0",
       "description": "GamesUp E-Commerce Platform - Node.js/Express Backend with React Frontend",
-      "main": "server/index.js",
+      "main": "index.js",
       "type": "commonjs",
       "engines": {
             "node": ">=18.0.0"
       },
       "scripts": {
-            "dev": "concurrently \"vite\" \"node server/index.js\"",
-            "dev:server": "node server/index.js",
+            "dev": "concurrently \"vite\" \"node index.js\"",
+            "dev:server": "node index.js",
             "dev:client": "vite",
-            "db:init": "node server/init-db.js",
+            "db:init": "node init-db.js",
             "build": "vite build",
             "build:full": "npm install && vite build",
-            "start": "node server/index.js",
+            "start": "node index.js",
             "prestart": "npm run build",
-            "postinstall": "npm run build && cp -r dist server/ || xcopy /E /I dist server\\dist && echo 'Dependencies installed and build completed'"
+            "postinstall": "npm run build && echo 'Dependencies installed and build completed'"
       },
       "keywords": [
             "express",

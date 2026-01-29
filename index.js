@@ -10,26 +10,24 @@ const paytabs = require('./services/paytabs');
 const oto = require('./services/oto');
 
 // Load environment variables from the root .env file
-dotenv.config({ path: path.join(__dirname, '../.env') });
+dotenv.config({ path: path.join(__dirname, '.env') });
 
 const app = express();
 const port = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET || 'dev_secret';
 
-// Serve static files from Vite's build directory FIRST
-// In production (Hostinger), dist is at the same level as server/
-// In development, dist is one level up from server/
-const distPath = path.join(__dirname, '../dist');
+// Serve static files from Vite's build directory
+// In the new unified structure, dist is in the same directory as the server
+const distPath = path.join(__dirname, 'dist');
 console.log('Serving static files from:', distPath);
 
-// Alternative: Check if dist exists in current directory (for Hostinger)
+// Check if dist exists, if not, serve from src for development
 const fs = require('fs');
-const altDistPath = path.join(__dirname, 'dist');
 let finalDistPath = distPath;
 
-if (!fs.existsSync(distPath) && fs.existsSync(altDistPath)) {
-  finalDistPath = altDistPath;
-  console.log('Using alternative dist path:', altDistPath);
+if (!fs.existsSync(distPath)) {
+  console.log('Dist directory not found, serving from src directory for development');
+  finalDistPath = path.join(__dirname, 'src');
 }
 
 // Configure static file serving with proper MIME types
