@@ -1446,7 +1446,7 @@ app.get(`${BASE_PATH}/admin/sold-products`, async (req, res) => {
 app.get('*', (req, res) => {
   if (fs.existsSync(distPath)) {
     // Don't serve index.html for static assets
-    const staticAssetPattern = /\.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot|json|map)$/;
+    const staticAssetPattern = /\.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot|json|map|ts|tsx)$/;
     if (staticAssetPattern.test(req.path)) {
       return res.status(404).json({ error: 'Static asset not found' });
     }
