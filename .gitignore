@@ -1,4 +1,6 @@
 node_modules/
 .env
 dist/
-client/node_modules/ 
+client/node_modules/
+# Allow client .env for frontend variables
+!client/.env 
