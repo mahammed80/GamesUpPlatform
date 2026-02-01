@@ -1,5 +1,4 @@
 node_modules/
 .env
-public/
 dist/
 client/node_modules/ 
