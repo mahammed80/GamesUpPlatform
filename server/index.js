@@ -10,37 +10,37 @@ const paytabs = require('./services/paytabs');
 const oto = require('./services/oto');
 
 // Load environment variables from the root .env file
-dotenv.config({ path: path.join(__dirname, '.env') });
+dotenv.config({ path: path.join(__dirname, '../.env') });
 
 const app = express();
 const port = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET || 'dev_secret';
 
 // Serve static files from Vite's build directory
-// In the new unified structure, dist is in the same directory as the server
-const distPath = path.join(__dirname, 'dist');
-console.log('Serving static files from:', distPath);
+// In the new structure, build output is in ../public/
+const publicPath = path.join(__dirname, '../public');
+console.log('Serving static files from:', publicPath);
 
-// Check if dist exists, if not, don't serve frontend in development
+// Check if public exists, if not, don't serve frontend in development
 const fs = require('fs');
-let finalDistPath = distPath;
+let finalPublicPath = publicPath;
 
-if (!fs.existsSync(distPath)) {
-  console.log('Dist directory not found - frontend not available. Run "npm run build" first.');
+if (!fs.existsSync(publicPath)) {
+  console.log('Public directory not found - frontend not available. Run "npm run build" first.');
   // In development without build, we don't serve static files
   // Vite dev server will handle the frontend
 }
 
-// Configure static file serving with proper MIME types - only if dist exists
-if (fs.existsSync(distPath)) {
-  console.log('Static file serving enabled for:', distPath);
+// Configure static file serving with proper MIME types - only if public exists
+if (fs.existsSync(publicPath)) {
+  console.log('Static file serving enabled for:', publicPath);
   
   // Set MIME types for JavaScript modules
   express.static.mime.define({
     'application/javascript': ['js', 'mjs']
   });
   
-  app.use(express.static(finalDistPath, {
+  app.use(express.static(finalPublicPath, {
     setHeaders: (res, filePath) => {
       console.log('Serving static file:', filePath);
       // Force correct MIME types for JavaScript modules
@@ -58,11 +58,11 @@ if (fs.existsSync(distPath)) {
     }
   }));
 } else {
-  console.log('Dist directory not found, static file serving disabled');
+  console.log('Public directory not found, static file serving disabled');
 }
 
 // Additional route to ensure JavaScript files get correct MIME type
-if (fs.existsSync(distPath)) {
+if (fs.existsSync(publicPath)) {
   app.get('*.js', (req, res, next) => {
     res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
     next();
@@ -1441,17 +1441,17 @@ app.get(`${BASE_PATH}/admin/sold-products`, async (req, res) => {
   }
 });
 
-// Fallback for client-side routing - serve index.html for all non-API routes (only if dist exists)
+// Fallback for client-side routing - serve index.html for all non-API routes (only if public exists)
 // But exclude static assets to prevent serving index.html for JS/CSS files
 app.get('*', (req, res) => {
-  if (fs.existsSync(distPath)) {
+  if (fs.existsSync(publicPath)) {
     // Don't serve index.html for static assets
     const staticAssetPattern = /\.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot|json|map|ts|tsx)$/;
     if (staticAssetPattern.test(req.path)) {
       return res.status(404).json({ error: 'Static asset not found' });
     }
     
-    const indexPath = path.join(finalDistPath, 'index.html');
+    const indexPath = path.join(finalPublicPath, 'index.html');
     console.log('Serving index.html from:', indexPath);
     res.sendFile(indexPath);
   } else {
