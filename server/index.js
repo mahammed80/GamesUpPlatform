@@ -5,6 +5,7 @@ const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const dotenv = require('dotenv');
 const path = require('path');
+const fs = require('fs');
 const multer = require('multer');
 const paytabs = require('./services/paytabs');
 const oto = require('./services/oto');
@@ -38,7 +39,6 @@ const publicPath = path.join(__dirname, '../public');
 console.log('Serving static files from:', publicPath);
 
 // Check if public exists, if not, don't serve frontend in development
-const fs = require('fs');
 let finalPublicPath = publicPath;
 
 if (!fs.existsSync(publicPath)) {
