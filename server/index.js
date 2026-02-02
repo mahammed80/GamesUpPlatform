@@ -160,12 +160,50 @@ const FUNCTION_NAME = process.env.VITE_SUPABASE_FUNCTION_NAME || 'make-server-f6
 const BASE_PATH = `/functions/v1/${FUNCTION_NAME}`;
 
 // Health check
-app.get('/', (req, res) => {
-  res.json({ status: 'ok', message: 'Games Up Server is running' });
+app.get(`${BASE_PATH}/health`, async (req, res) => {
+  try {
+    // Test database connection
+    const connection = await pool.getConnection();
+    await connection.ping();
+    connection.release();
+    
+    res.json({
+      status: 'healthy',
+      timestamp: new Date().toISOString(),
+      database: 'connected',
+      environment: {
+        NODE_ENV: process.env.NODE_ENV,
+        PORT: process.env.PORT,
+        DB_HOST: process.env.DB_HOST,
+        DB_USER: process.env.DB_USER,
+        DB_NAME: process.env.DB_NAME
+      }
+    });
+  } catch (error) {
+    res.status(503).json({
+      status: 'unhealthy',
+      timestamp: new Date().toISOString(),
+      database: 'disconnected',
+      error: error.message,
+      environment: {
+        NODE_ENV: process.env.NODE_ENV,
+        PORT: process.env.PORT,
+        DB_HOST: process.env.DB_HOST,
+        DB_USER: process.env.DB_USER,
+        DB_NAME: process.env.DB_NAME
+      }
+    });
+  }
 });
 
-app.get(`${BASE_PATH}/health`, (req, res) => {
-  res.json({ status: 'ok', message: 'Games Up Server is running' });
+// Simple root health check
+app.get('/', (req, res) => {
+  res.json({
+    message: 'GamesUp Platform API is running',
+    status: 'active',
+    timestamp: new Date().toISOString(),
+    health: `${BASE_PATH}/health`
+  });
 });
 
 // Upload Route
