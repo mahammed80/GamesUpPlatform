@@ -206,6 +206,16 @@ app.get('/', (req, res) => {
   });
 });
 
+// Simple ping endpoint (no dependencies)
+app.get('/ping', (req, res) => {
+  res.json({
+    message: 'pong',
+    timestamp: new Date().toISOString(),
+    nodeVersion: process.version,
+    platform: process.platform
+  });
+});
+
 // Upload Route
 app.post(`${BASE_PATH}/upload`, upload.single('image'), (req, res) => {
   try {
@@ -1515,6 +1525,19 @@ app.get('*', (req, res) => {
 });
 
 app.listen(port, () => {
-  console.log(`Server running on port ${port}`);
-  console.log(`Base URL: http://localhost:${port}${BASE_PATH}`);
+  console.log(`🚀 Server running on port ${port}`);
+  console.log(`🌐 Base URL: http://localhost:${port}${BASE_PATH}`);
+  console.log(`❤️  Health check: http://localhost:${port}/`);
+  console.log(`🏓 Ping test: http://localhost:${port}/ping`);
+  console.log(`🔍 Detailed health: http://localhost:${port}${BASE_PATH}/health`);
+}).on('error', (err) => {
+  console.error('❌ Server failed to start:', err.message);
+  if (err.code === 'EADDRINUSE') {
+    console.error(`⚠️  Port ${port} is already in use`);
+  } else if (err.code === 'EACCES') {
+    console.error(`⚠️  Permission denied to bind to port ${port}`);
+  } else {
+    console.error(`⚠️  Error code: ${err.code}`);
+  }
+  process.exit(1);
 });
