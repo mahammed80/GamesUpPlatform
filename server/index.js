@@ -13,6 +13,14 @@ const oto = require('./services/oto');
 // Load environment variables from the .env file
 const envPath = path.resolve(__dirname, '../.env');
 
+// Remove .env.local if it exists (to prevent conflicts)
+const localEnvPath = path.resolve(__dirname, '../.env.local');
+if (fs.existsSync(localEnvPath)) {
+  console.log('🗑️  Removing .env.local to prevent conflicts...');
+  fs.unlinkSync(localEnvPath);
+  console.log('✅ .env.local removed');
+}
+
 console.log('Loading .env from:', envPath);
 const result = dotenv.config({ path: envPath });
 
