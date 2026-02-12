@@ -6,7 +6,7 @@ const USE_LOCAL_SERVER = import.meta.env.VITE_USE_LOCAL_SERVER === 'true';
 const CUSTOM_API_URL = import.meta.env.VITE_API_URL;
 
 export const BASE_URL = CUSTOM_API_URL || (USE_LOCAL_SERVER 
-  ? `http://localhost:3001/functions/v1/${functionName}`
+  ? `http://localhost:5000/functions/v1/${functionName}`
   : `https://${projectId}.supabase.co/functions/v1/${functionName}`);
 
 let accessToken: string | null = null;
@@ -242,4 +242,12 @@ export const rolesAPI = {
 // Admin API
 export const adminAPI = {
   getSoldProducts: () => fetchAPI('/admin/sold-products'),
+};
+
+// Generic API
+export const api = {
+  get: (endpoint: string) => fetchAPI(endpoint),
+  post: (endpoint: string, body: any) => fetchAPI(endpoint, { method: 'POST', body: JSON.stringify(body) }),
+  put: (endpoint: string, body: any) => fetchAPI(endpoint, { method: 'PUT', body: JSON.stringify(body) }),
+  delete: (endpoint: string) => fetchAPI(endpoint, { method: 'DELETE' }),
 };

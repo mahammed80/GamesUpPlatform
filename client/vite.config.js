@@ -114,6 +114,11 @@ export default defineConfig({
     port: 5173,
     open: true,
     proxy: {
+      '/functions/v1': {
+        target: 'http://localhost:5000',
+        changeOrigin: true,
+        secure: false,
+      },
       '/api': {
         target: 'http://localhost:5000',
         changeOrigin: true,

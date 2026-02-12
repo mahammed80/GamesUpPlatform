@@ -222,12 +222,14 @@ export function POSNew() {
       );
 
       if (response.ok) {
+        const data = await response.json();
+        
         // Prepare invoice data
         const invoice = {
-           invoiceNumber: `INV-${Date.now()}`,
+           invoiceNumber: data.orderNumber || `INV-${Date.now()}`,
            date: new Date().toISOString(),
            customer: customerInfo,
-           items: [...cart], // Copy cart items
+           items: data.purchasedItems || [...cart], // Use server returned items which contain digital keys
            subtotal,
            tax,
            total
@@ -662,7 +664,7 @@ export function POSNew() {
                       {lastInvoice.items.map((item: any, index: number) => (
                         <tr key={index}>
                           <td className="py-3 text-sm text-gray-600 dark:text-gray-300">
-                            <div>{item.name}</div>
+                            <div className="font-medium">{item.name}</div>
                             {item.attributes && Object.entries(item.attributes).length > 0 && (
                               <div className="text-xs text-gray-500 mt-1">
                                 {Object.entries(item.attributes).map(([key, val]) => (
@@ -670,11 +672,24 @@ export function POSNew() {
                                 ))}
                               </div>
                             )}
+                            {item.digitalItem && (
+                              <div className="mt-2 text-xs bg-gray-50 dark:bg-gray-700/50 p-2 rounded border border-gray-100 dark:border-gray-600">
+                                {item.digitalItem.email && (
+                                  <div className="flex gap-2"><span className="font-semibold text-gray-700 dark:text-gray-300">Email:</span> <span className="font-mono text-gray-600 dark:text-gray-400 select-all">{item.digitalItem.email}</span></div>
+                                )}
+                                {item.digitalItem.password && (
+                                  <div className="flex gap-2"><span className="font-semibold text-gray-700 dark:text-gray-300">Password:</span> <span className="font-mono text-gray-600 dark:text-gray-400 select-all">{item.digitalItem.password}</span></div>
+                                )}
+                                {item.digitalItem.code && (
+                                  <div className="flex gap-2"><span className="font-semibold text-gray-700 dark:text-gray-300">Code:</span> <span className="font-mono text-gray-600 dark:text-gray-400 select-all">{item.digitalItem.code}</span></div>
+                                )}
+                              </div>
+                            )}
                           </td>
-                          <td className="py-3 text-center text-sm text-gray-600 dark:text-gray-300">{item.quantity}</td>
+                          <td className="py-3 text-center text-sm text-gray-600 dark:text-gray-300">{item.quantity || 1}</td>
                           <td className="py-3 text-right text-sm text-gray-600 dark:text-gray-300">{formatPrice(item.price)}</td>
                           <td className="py-3 text-right text-sm font-medium text-gray-900 dark:text-white">
-                            {formatPrice(item.price * item.quantity)}
+                            {formatPrice(item.price * (item.quantity || 1))}
                           </td>
                         </tr>
                       ))}
@@ -744,11 +759,20 @@ export function POSNew() {
                 <tbody className="divide-y divide-gray-200">
                   {lastInvoice.items.map((item: any, index: number) => (
                     <tr key={index}>
-                      <td className="py-3 text-sm text-gray-600">{item.name}</td>
-                      <td className="py-3 text-center text-sm text-gray-600">{item.quantity}</td>
+                      <td className="py-3 text-sm text-gray-600">
+                        <div className="font-medium">{item.name}</div>
+                        {item.digitalItem && (
+                          <div className="mt-1 text-xs border border-gray-200 p-1 rounded">
+                            {item.digitalItem.email && <div><span className="font-semibold">Email:</span> {item.digitalItem.email}</div>}
+                            {item.digitalItem.password && <div><span className="font-semibold">Password:</span> {item.digitalItem.password}</div>}
+                            {item.digitalItem.code && <div><span className="font-semibold">Code:</span> {item.digitalItem.code}</div>}
+                          </div>
+                        )}
+                      </td>
+                      <td className="py-3 text-center text-sm text-gray-600">{item.quantity || 1}</td>
                       <td className="py-3 text-right text-sm text-gray-600">{formatPrice(item.price)}</td>
                       <td className="py-3 text-right text-sm font-medium text-gray-900">
-                        {formatPrice(item.price * item.quantity)}
+                        {formatPrice(item.price * (item.quantity || 1))}
                       </td>
                     </tr>
                   ))}

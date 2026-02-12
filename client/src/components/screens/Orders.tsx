@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Search, Eye, Download, FileText, Printer, X } from 'lucide-react';
 import { Card } from '../ui/card';
-import { ordersAPI } from '../../utils/api';
+import { ordersAPI, api } from '../../utils/api';
 import { useStoreSettings } from '../../context/StoreSettingsContext';
 import { QuickEditCell } from '../ui/QuickEditCell';
 import html2canvas from 'html2canvas';
@@ -34,6 +34,7 @@ export function Orders() {
   const [statusFilter, setStatusFilter] = useState('All');
   const [showInvoice, setShowInvoice] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
+  const [viewingProof, setViewingProof] = useState<string | null>(null);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
 
   useEffect(() => {
@@ -73,8 +74,22 @@ export function Orders() {
      updateOrder(id, { status: newStatus });
   };
 
-  const handleViewProof = (url: string) => {
-    window.open(url, '_blank');
+  const handleViewProof = async (id: string, url: string) => {
+    setViewingProof(url);
+    
+    // Delete the proof from server (viewed once)
+    try {
+      await api.delete(`/orders/${id}/payment-proof`);
+      // Update local state to remove the proof button
+      setOrders(prev => prev.map(o => o.id === id ? { ...o, payment_proof: undefined } : o));
+    } catch (err) {
+      console.error('Failed to delete proof:', err);
+    }
+  };
+
+  const handleViewDetails = (order: Order) => {
+    setSelectedOrder(order);
+    setShowDetails(true);
   };
 
   const handleDownloadPDF = async () => {
@@ -297,7 +312,7 @@ export function Orders() {
                     <td className="py-4 px-4 text-sm text-gray-600 dark:text-gray-300">
                       {order.payment_proof ? (
                         <button
-                          onClick={() => handleViewProof(order.payment_proof!)}
+                          onClick={() => handleViewProof(order.id, order.payment_proof!)}
                           className="text-blue-600 hover:underline flex items-center gap-1"
                         >
                           <Eye className="w-4 h-4" />
@@ -618,6 +633,49 @@ export function Orders() {
                     View Invoice
                   </button>
                 </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+        {viewingProof && (
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setViewingProof(null)}>
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+              className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
+                <h3 className="text-lg font-bold text-gray-900 dark:text-white">Payment Proof</h3>
+                <button
+                  onClick={() => setViewingProof(null)}
+                  className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg text-gray-500 dark:text-gray-400"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+              <div className="flex-1 overflow-auto p-4 bg-gray-100 dark:bg-gray-900 flex items-center justify-center">
+                <img 
+                  src={viewingProof} 
+                  alt="Payment Proof" 
+                  className="max-w-full max-h-full object-contain rounded-lg shadow-lg"
+                />
+              </div>
+              <div className="p-4 border-t border-gray-200 dark:border-gray-700 flex justify-end gap-3">
+                 <button
+                    onClick={() => window.open(viewingProof, '_blank')}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
+                  >
+                    <Download className="w-4 h-4" />
+                    Open Original
+                  </button>
+                  <button
+                    onClick={() => setViewingProof(null)}
+                    className="px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                  >
+                    Close
+                  </button>
               </div>
             </motion.div>
           </div>

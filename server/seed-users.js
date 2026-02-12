@@ -56,7 +56,7 @@ async function seedUsers() {
 
         console.log('\nTest users created successfully!');
         console.log('\nYou can now login with:');
-        console.log('- admin@gamesup.com / admin123');
+        console.log('- admin@gamesup.com / Admin@123');
         console.log('- manager@gamesup.com / manager123');
         console.log('- staff@gamesup.com / staff123');
 

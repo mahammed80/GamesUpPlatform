@@ -1,9 +1,8 @@
 import { LayoutDashboard, Package, ShoppingCart, TrendingUp, Users, CheckSquare, UserCog, Settings, LogOut, ChevronLeft, Shield, Mail, Image, Clock, CreditCard, Layers, Truck, Key } from 'lucide-react';
+import { NavLink } from 'react-router-dom';
 import { Screen } from '../AdminApp';
 
 interface SidebarProps {
-  currentScreen: Screen;
-  onNavigate: (screen: Screen) => void;
   collapsed: boolean;
   onToggleCollapse: () => void;
   onLogout: () => void;
@@ -27,15 +26,20 @@ const menuItems = [
   { id: 'roles' as Screen, label: 'Roles & Access', icon: Shield, roles: ['admin'] },
   { id: 'system' as Screen, label: 'System', icon: Layers, roles: ['admin'] },
   { id: 'delivery' as Screen, label: 'Delivery Options', icon: Truck, roles: ['admin', 'manager'] },
+  { id: 'email-templates' as Screen, label: 'Email Templates', icon: Mail, roles: ['admin'] },
   { id: 'settings' as Screen, label: 'Settings', icon: Settings, roles: ['admin', 'manager'] },
 ];
 
-export function Sidebar({ currentScreen, onNavigate, collapsed, onToggleCollapse, onLogout, userRole = 'admin', userPermissions }: SidebarProps) {
+export function Sidebar({ collapsed, onToggleCollapse, onLogout, userRole = 'admin', userPermissions }: SidebarProps) {
   // Filter menu items based on user permissions or role
   const filteredMenuItems = menuItems.filter(item => {
     // If permissions are present, use them
     if (userPermissions && Object.keys(userPermissions).length > 0) {
-      return !!userPermissions[item.id];
+      // Allow if explicit permission exists
+      if (userPermissions[item.id]) return true;
+      // Fallback for email-templates if not explicitly in permissions (temporary fix)
+      if (item.id === 'email-templates' && userRole === 'admin') return true;
+      return false;
     }
     
     // Fallback to role-based filtering (legacy support)
@@ -71,12 +75,11 @@ export function Sidebar({ currentScreen, onNavigate, collapsed, onToggleCollapse
       <nav className="flex-1 py-4 px-2 overflow-y-auto">
         {filteredMenuItems.map((item) => {
           const Icon = item.icon;
-          const isActive = currentScreen === item.id;
           return (
-            <button
+            <NavLink
               key={item.id}
-              onClick={() => onNavigate(item.id)}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg mb-1 transition-all ${
+              to={`/admin/${item.id}`}
+              className={({ isActive }) => `w-full flex items-center gap-3 px-3 py-2.5 rounded-lg mb-1 transition-all ${
                 isActive
                   ? 'bg-red-600 text-white shadow-lg shadow-red-500/50'
                   : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
@@ -85,7 +88,7 @@ export function Sidebar({ currentScreen, onNavigate, collapsed, onToggleCollapse
             >
               <Icon className="w-5 h-5 flex-shrink-0" />
               {!collapsed && <span className="text-sm font-medium">{item.label}</span>}
-            </button>
+            </NavLink>
           );
         })}
       </nav>

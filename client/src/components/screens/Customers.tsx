@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Search, Star, Mail, Phone, MapPin, X } from 'lucide-react';
 import { Card } from '../ui/card';
-import { customersAPI } from '../../utils/api';
+import { customersAPI, ordersAPI } from '../../utils/api';
 import { useStoreSettings } from '../../context/StoreSettingsContext';
 
 // Mock history for now, could be fetched from API later
@@ -17,10 +17,31 @@ export function Customers() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCustomer, setSelectedCustomer] = useState<any | null>(null);
+  const [customerOrders, setCustomerOrders] = useState<any[]>([]);
+  const [ordersLoading, setOrdersLoading] = useState(false);
 
   useEffect(() => {
     loadCustomers();
   }, []);
+
+  useEffect(() => {
+    if (selectedCustomer?.email) {
+      loadCustomerOrders(selectedCustomer.email);
+    }
+  }, [selectedCustomer]);
+
+  const loadCustomerOrders = async (email: string) => {
+    try {
+      setOrdersLoading(true);
+      const data = await ordersAPI.getAll({ email });
+      setCustomerOrders(data.orders || []);
+    } catch (error) {
+      console.error('Failed to load customer orders:', error);
+      setCustomerOrders([]);
+    } finally {
+      setOrdersLoading(false);
+    }
+  };
 
   const loadCustomers = async () => {
     try {
@@ -129,7 +150,7 @@ export function Customers() {
                     </div>
                     <div>
                       <p className="text-gray-500 dark:text-gray-400">Spent</p>
-                      <p className="font-semibold text-gray-900 dark:text-white">{formatCurrency(customer.spent)}</p>
+                      <p className="font-semibold text-gray-900 dark:text-white">{formatPrice(customer.spent)}</p>
                     </div>
                   </div>
                 </div>
@@ -218,7 +239,7 @@ export function Customers() {
                 </Card>
                 <Card className="p-8">
                   <p className="text-sm text-gray-500 dark:text-gray-400">Total Spent</p>
-                  <p className="text-2xl font-bold text-gray-900 dark:text-white mt-1">{formatCurrency(selectedCustomer.spent)}</p>
+                  <p className="text-2xl font-bold text-gray-900 dark:text-white mt-1">{formatPrice(selectedCustomer.spent)}</p>
                 </Card>
               </div>
 

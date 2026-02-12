@@ -183,15 +183,15 @@ export function Settings() {
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Default Currency</label>
                 <select 
-                  value={`${formData.currency_code} - ${formData.currency_code === 'EGP' ? 'Egyptian Pound' : formData.currency_code === 'USD' ? 'US Dollar' : formData.currency_code === 'EUR' ? 'Euro' : formData.currency_code === 'GBP' ? 'British Pound' : 'Japanese Yen'}`}
+                  value={formData.currency_code}
                   onChange={handleCurrencyChange}
                   className="w-full px-4 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-red-500"
                 >
-                  <option>USD - US Dollar</option>
-                  <option>EUR - Euro</option>
-                  <option>GBP - British Pound</option>
-                  <option>JPY - Japanese Yen</option>
-                  <option>EGP - Egyptian Pound</option>
+                  <option value="USD">USD - US Dollar</option>
+                  <option value="EUR">EUR - Euro</option>
+                  <option value="GBP">GBP - British Pound</option>
+                  <option value="JPY">JPY - Japanese Yen</option>
+                  <option value="EGP">EGP - Egyptian Pound</option>
                 </select>
               </div>
               <div>
@@ -353,7 +353,10 @@ export function Settings() {
 
       {/* Save Button */}
       <div className="flex justify-end">
-        <Button icon={Save} onClick={handleSave}>Save Changes</Button>
+        <Button onClick={handleSave}>
+          <Save className="w-4 h-4 mr-2" />
+          Save Changes
+        </Button>
       </div>
     </div>
   );

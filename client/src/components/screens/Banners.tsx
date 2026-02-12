@@ -33,6 +33,14 @@ export function Banners() {
     endDate: '',
   });
 
+  const [heroConfig, setHeroConfig] = useState({
+    badge: '🎮 Your Ultimate Gaming Destination',
+    title: 'GAMES UP',
+    subtitle: 'Experience the next level of gaming with our premium collection of consoles, accessories, and titles.',
+    ctaPrimary: 'Shop Now',
+    ctaSecondary: 'Learn More'
+  });
+
   const [specialOffer, setSpecialOffer] = useState({
     title: 'SPECIAL OFFER',
     subtitle: 'Up to 50% Off on Selected Items'
@@ -44,7 +52,19 @@ export function Banners() {
     if (savedOffer) {
       setSpecialOffer(JSON.parse(savedOffer));
     }
+    const savedHero = localStorage.getItem('heroConfig');
+    if (savedHero) {
+      setHeroConfig(JSON.parse(savedHero));
+    }
   }, []);
+
+  const handleSaveHero = () => {
+    localStorage.setItem('heroConfig', JSON.stringify(heroConfig));
+    // Dispatch event for same-tab updates
+    window.dispatchEvent(new Event('heroConfigUpdated'));
+    window.dispatchEvent(new Event('storage')); // Force update for some listeners
+    alert('Hero section updated successfully!');
+  };
 
   const handleSaveSpecialOffer = () => {
     localStorage.setItem('specialOfferConfig', JSON.stringify(specialOffer));

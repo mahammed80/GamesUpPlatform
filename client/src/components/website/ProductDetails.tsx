@@ -113,6 +113,30 @@ export function ProductDetails({ onOpenCart, productId }: ProductDetailsProps) {
     onOpenCart();
   };
 
+  const toggleFavorite = () => {
+    if (!product) return;
+
+    const favorites = JSON.parse(localStorage.getItem('favorites') || '[]');
+    const index = favorites.findIndex((f: any) => f.id === product.id);
+
+    if (index >= 0) {
+      favorites.splice(index, 1);
+      setIsFavorite(false);
+    } else {
+      favorites.push({
+        id: product.id,
+        name: product.name,
+        price: product.price,
+        image: product.image,
+        category: product.categorySlug,
+        rating: product.rating,
+      });
+      setIsFavorite(true);
+    }
+
+    localStorage.setItem('favorites', JSON.stringify(favorites));
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">

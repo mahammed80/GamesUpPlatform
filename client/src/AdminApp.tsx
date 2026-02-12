@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import { Sidebar } from './components/Sidebar';
 import { TopBar } from './components/TopBar';
 import { Login } from './components/Login';
@@ -18,13 +19,13 @@ import { POSNew } from './components/screens/POSNew';
 import { System } from './components/screens/System';
 import { Delivery } from './components/screens/Delivery';
 import { SoldProducts } from './components/screens/SoldProducts';
+import { EmailTemplates } from './components/screens/EmailTemplates';
 import { setAccessToken } from './utils/api';
 import { projectId } from './utils/supabase/info';
 
-export type Screen = 'dashboard' | 'products' | 'orders' | 'sold-products' | 'analytics' | 'customers' | 'tasks' | 'team' | 'settings' | 'roles' | 'outlook' | 'banners' | 'hr' | 'pos' | 'system' | 'delivery';
+export type Screen = 'dashboard' | 'products' | 'orders' | 'sold-products' | 'analytics' | 'customers' | 'tasks' | 'team' | 'settings' | 'roles' | 'outlook' | 'banners' | 'hr' | 'pos' | 'system' | 'delivery' | 'email-templates';
 
 export default function AdminApp() {
-  const [currentScreen, setCurrentScreen] = useState<Screen>('dashboard');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(() => {
     const savedTheme = localStorage.getItem('theme');
@@ -98,49 +99,10 @@ export default function AdminApp() {
     return <Login onLogin={handleLogin} />;
   }
 
-  const renderScreen = () => {
-    switch (currentScreen) {
-      case 'dashboard':
-        return <Dashboard />;
-      case 'products':
-        return <Products />;
-      case 'orders':
-        return <Orders />;
-      case 'pos':
-        return <POSNew />;
-      case 'analytics':
-        return <Analytics />;
-      case 'customers':
-        return <Customers />;
-      case 'banners':
-        return <Banners />;
-      case 'outlook':
-        return <Outlook />;
-      case 'hr':
-        return <HR />;
-      case 'tasks':
-        return <Tasks />;
-      case 'team':
-        return <TeamMembers />;
-      case 'roles':
-        return <Roles />;
-      case 'system':
-        return <System />;
-      case 'settings':
-        return <Settings />;
-      case 'delivery':
-        return <Delivery />;
-      default:
-        return <Dashboard />;
-    }
-  };
-
   return (
     <div className={isDarkMode ? 'dark' : ''}>
       <div className="flex h-screen bg-white dark:bg-gray-900 transition-colors">
         <Sidebar
-          currentScreen={currentScreen}
-          onNavigate={setCurrentScreen}
           collapsed={sidebarCollapsed}
           onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
           onLogout={handleLogout}
@@ -155,7 +117,27 @@ export default function AdminApp() {
             onLogout={handleLogout}
           />
           <main className="flex-1 overflow-y-auto p-6">
-            {renderScreen()}
+            <Routes>
+              <Route path="/" element={<Navigate to="dashboard" replace />} />
+              <Route path="dashboard" element={<Dashboard />} />
+              <Route path="products" element={<Products />} />
+              <Route path="orders" element={<Orders />} />
+              <Route path="sold-products" element={<SoldProducts />} />
+              <Route path="pos" element={<POSNew />} />
+              <Route path="analytics" element={<Analytics />} />
+              <Route path="customers" element={<Customers />} />
+              <Route path="banners" element={<Banners />} />
+              <Route path="outlook" element={<Outlook />} />
+              <Route path="hr" element={<HR />} />
+              <Route path="tasks" element={<Tasks />} />
+              <Route path="team" element={<TeamMembers />} />
+              <Route path="roles" element={<Roles />} />
+              <Route path="system" element={<System />} />
+              <Route path="settings" element={<Settings />} />
+              <Route path="delivery" element={<Delivery />} />
+              <Route path="email-templates" element={<EmailTemplates />} />
+              <Route path="*" element={<Navigate to="dashboard" replace />} />
+            </Routes>
           </main>
         </div>
       </div>

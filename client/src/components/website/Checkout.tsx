@@ -28,7 +28,7 @@ export function Checkout({ onBack, onSuccess }: CheckoutProps) {
   const [deliveryOptions, setDeliveryOptions] = useState<DeliveryOption[]>([]);
   const [selectedDelivery, setSelectedDelivery] = useState<string>('');
   const [loading, setLoading] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState<'card' | 'cod' | 'instapay'>('card');
+  const [paymentMethod, setPaymentMethod] = useState<'card' | 'cod' | 'instapay' | 'vodafone_cash' | 'telda'>('card');
   const [paymentProofFile, setPaymentProofFile] = useState<File | null>(null);
 
   const [formData, setFormData] = useState({
@@ -141,7 +141,7 @@ export function Checkout({ onBack, onSuccess }: CheckoutProps) {
     } else if (step === 'delivery') {
       setStep('payment');
     } else if (step === 'payment') {
-      if (paymentMethod === 'instapay' && !paymentProofFile) {
+      if (['instapay', 'vodafone_cash', 'telda'].includes(paymentMethod) && !paymentProofFile) {
         alert('Please upload a screenshot of your payment.');
         return;
       }
@@ -149,9 +149,9 @@ export function Checkout({ onBack, onSuccess }: CheckoutProps) {
       setLoading(true);
       
       try {
-        // Upload proof if Instapay
+        // Upload proof if Manual Payment
         let paymentProofUrl = null;
-        if (paymentMethod === 'instapay' && paymentProofFile) {
+        if (['instapay', 'vodafone_cash', 'telda'].includes(paymentMethod) && paymentProofFile) {
           const formData = new FormData();
           formData.append('image', paymentProofFile);
           
@@ -682,6 +682,44 @@ export function Checkout({ onBack, onSuccess }: CheckoutProps) {
                         <p className="text-sm text-gray-600">Transfer and upload screenshot</p>
                       </div>
                     </label>
+
+                    {/* Vodafone Cash */}
+                    <label className={`flex items-center p-4 border-2 rounded-xl cursor-pointer transition-all ${
+                      paymentMethod === 'vodafone_cash' ? 'border-red-500 bg-red-50' : 'border-gray-200 hover:border-gray-300'
+                    }`}>
+                      <input
+                        type="radio"
+                        name="paymentMethod"
+                        value="vodafone_cash"
+                        checked={paymentMethod === 'vodafone_cash'}
+                        onChange={(e) => setPaymentMethod(e.target.value as any)}
+                        className="w-5 h-5 text-red-600 mr-4"
+                      />
+                      <div className="w-6 h-6 mr-3 flex items-center justify-center text-lg">📱</div>
+                      <div>
+                        <p className="font-semibold text-gray-900">Vodafone Cash</p>
+                        <p className="text-sm text-gray-600">Transfer and upload screenshot</p>
+                      </div>
+                    </label>
+
+                    {/* Telda */}
+                    <label className={`flex items-center p-4 border-2 rounded-xl cursor-pointer transition-all ${
+                      paymentMethod === 'telda' ? 'border-red-500 bg-red-50' : 'border-gray-200 hover:border-gray-300'
+                    }`}>
+                      <input
+                        type="radio"
+                        name="paymentMethod"
+                        value="telda"
+                        checked={paymentMethod === 'telda'}
+                        onChange={(e) => setPaymentMethod(e.target.value as any)}
+                        className="w-5 h-5 text-red-600 mr-4"
+                      />
+                      <div className="w-6 h-6 mr-3 flex items-center justify-center text-lg">💳</div>
+                      <div>
+                        <p className="font-semibold text-gray-900">Telda</p>
+                        <p className="text-sm text-gray-600">Transfer and upload screenshot</p>
+                      </div>
+                    </label>
                   </div>
 
                   {/* Payment Details / Instructions */}
@@ -704,6 +742,44 @@ export function Checkout({ onBack, onSuccess }: CheckoutProps) {
                           <p className="font-bold text-gray-900 mb-2">Instapay Details:</p>
                           <p className="text-sm text-gray-600">Instapay ID: <span className="font-mono font-bold text-gray-900">username@instapay</span></p>
                           <p className="text-sm text-gray-600">Phone: <span className="font-mono font-bold text-gray-900">01234567890</span></p>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">Upload Payment Screenshot</label>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={handleFileChange}
+                            className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-red-50 file:text-red-700 hover:file:bg-red-100"
+                          />
+                          <p className="text-xs text-gray-500 mt-1">Please upload a clear screenshot of the transaction receipt.</p>
+                        </div>
+                      </div>
+                    )}
+
+                    {paymentMethod === 'vodafone_cash' && (
+                      <div className="space-y-4">
+                        <div className="bg-white p-4 rounded-lg border border-gray-200">
+                          <p className="font-bold text-gray-900 mb-2">Vodafone Cash Details:</p>
+                          <p className="text-sm text-gray-600">Phone: <span className="font-mono font-bold text-gray-900">010xxxxxxxx</span></p>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">Upload Payment Screenshot</label>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={handleFileChange}
+                            className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-red-50 file:text-red-700 hover:file:bg-red-100"
+                          />
+                          <p className="text-xs text-gray-500 mt-1">Please upload a clear screenshot of the transaction receipt.</p>
+                        </div>
+                      </div>
+                    )}
+
+                    {paymentMethod === 'telda' && (
+                      <div className="space-y-4">
+                        <div className="bg-white p-4 rounded-lg border border-gray-200">
+                          <p className="font-bold text-gray-900 mb-2">Telda Details:</p>
+                          <p className="text-sm text-gray-600">Telda ID: <span className="font-mono font-bold text-gray-900">username@telda</span></p>
                         </div>
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-2">Upload Payment Screenshot</label>

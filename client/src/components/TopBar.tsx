@@ -1,5 +1,6 @@
 import { Search, Bell, Moon, Sun, ChevronDown, LogOut, Settings, User, Globe } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 interface TopBarProps {
   isDarkMode: boolean;
@@ -10,6 +11,7 @@ interface TopBarProps {
 }
 
 export function TopBar({ isDarkMode, onToggleTheme, user, onLogout, onViewWebsite }: TopBarProps) {
+  const navigate = useNavigate();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -115,7 +117,10 @@ export function TopBar({ isDarkMode, onToggleTheme, user, onLogout, onViewWebsit
                   <span>My Profile</span>
                 </button>
                 <button
-                  onClick={() => setIsDropdownOpen(false)}
+                  onClick={() => {
+                    setIsDropdownOpen(false);
+                    navigate('/admin/settings');
+                  }}
                   className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
                 >
                   <Settings className="w-4 h-4" />

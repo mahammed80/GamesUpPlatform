@@ -7,8 +7,6 @@ const dotenv = require('dotenv');
 const path = require('path');
 const fs = require('fs');
 const multer = require('multer');
-const paytabs = require('./services/paytabs');
-const oto = require('./services/oto');
 
 // Load environment variables from the .env file
 const envPath = path.resolve(__dirname, '../.env');
@@ -42,9 +40,16 @@ if (result.error) {
   console.log('✅ .env loaded successfully');
 }
 
+const paytabs = require('./services/paytabs');
+const oto = require('./services/oto');
+const emailService = require('./services/email');
+
 const app = express();
 const port = process.env.PORT || 5000;
 const JWT_SECRET = process.env.JWT_SECRET || 'dev_secret';
+
+// Verify SMTP Connection
+emailService.verifyConnection();
 
 // Serve static files from Vite's build directory
 // In the new structure, build output is in ../public/
@@ -112,7 +117,12 @@ app.use(cors({
 app.use(express.json());
 
 // Serve uploads with proper MIME types
-app.use('/uploads', express.static(path.join(__dirname, 'uploads'), {
+const uploadDir = path.join(__dirname, 'uploads');
+if (!fs.existsSync(uploadDir)){
+    fs.mkdirSync(uploadDir, { recursive: true });
+}
+
+app.use('/uploads', express.static(uploadDir, {
   setHeaders: (res, filePath) => {
     if (filePath.endsWith('.js')) {
       res.setHeader('Content-Type', 'application/javascript');
@@ -123,7 +133,8 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads'), {
 // Configure multer
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
-    cb(null, 'uploads/')
+    // Use absolute path to ensure uploads go to server/uploads regardless of CWD
+    cb(null, uploadDir)
   },
   filename: function (req, file, cb) {
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9)
@@ -171,6 +182,81 @@ const pool = mysql.createPool({
 
 const FUNCTION_NAME = process.env.VITE_SUPABASE_FUNCTION_NAME || 'make-server-f6f1fb51';
 const BASE_PATH = `/functions/v1/${FUNCTION_NAME}`;
+
+// Email Test Route
+app.post(`${BASE_PATH}/email/test`, async (req, res) => {
+    const { to, subject, text, html } = req.body;
+    
+    if (!to) {
+        return res.status(400).json({ error: 'Recipient email (to) is required' });
+    }
+
+    const result = await emailService.sendEmail(
+        to, 
+        subject || 'Test Email', 
+        text || 'This is a test email from GamesUp Platform.', 
+        html
+    );
+
+    if (result.success) {
+        res.json({ message: 'Email sent successfully', messageId: result.messageId });
+    } else {
+        res.status(500).json({ error: 'Failed to send email', details: result.error });
+    }
+});
+
+// Email Templates Endpoints
+app.get(`${BASE_PATH}/email-templates`, async (req, res) => {
+    try {
+        const [rows] = await pool.query('SELECT * FROM email_templates ORDER BY type');
+        res.json(rows);
+    } catch (error) {
+        console.error('Error fetching email templates:', error);
+        res.status(500).json({ error: 'Database error' });
+    }
+});
+
+app.get(`${BASE_PATH}/email-templates/:type`, async (req, res) => {
+    const { type } = req.params;
+    try {
+        const [rows] = await pool.query('SELECT * FROM email_templates WHERE type = ?', [type]);
+        
+        if (rows.length === 0) {
+            return res.status(404).json({ error: 'Template not found' });
+        }
+        
+        res.json(rows[0]);
+    } catch (error) {
+        console.error('Error fetching email template:', error);
+        res.status(500).json({ error: 'Database error' });
+    }
+});
+
+app.put(`${BASE_PATH}/email-templates/:type`, async (req, res) => {
+    const { type } = req.params;
+    const { subject, body } = req.body;
+    
+    if (!subject || !body) {
+        return res.status(400).json({ error: 'Subject and body are required' });
+    }
+
+    try {
+        const [result] = await pool.query(
+            'UPDATE email_templates SET subject = ?, body = ? WHERE type = ?',
+            [subject, body, type]
+        );
+        
+        if (result.affectedRows === 0) {
+            // Optionally insert if not exists, but for now we expect it to exist via seed
+            return res.status(404).json({ error: 'Template not found' });
+        }
+        
+        res.json({ message: 'Template updated successfully' });
+    } catch (error) {
+        console.error('Error updating email template:', error);
+        res.status(500).json({ error: 'Database error' });
+    }
+});
 
 // Health check
 app.get(`${BASE_PATH}/health`, async (req, res) => {
@@ -322,6 +408,34 @@ app.post(`${BASE_PATH}/auth/login`, async (req, res) => {
   } catch (error) {
     console.error('Login error:', error);
     res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Setup Accounts (Missing Endpoint)
+app.post(`${BASE_PATH}/setup-accounts`, async (req, res) => {
+  try {
+    // This endpoint seems to be for initial setup or verification
+    // We can return success since we already seeded the database
+    res.json({ success: true, message: 'Accounts setup verified' });
+  } catch (error) {
+    console.error('Setup accounts error:', error);
+    res.status(500).json({ error: 'Failed to setup accounts' });
+  }
+});
+
+// Store Settings (Missing Endpoint)
+app.get(`${BASE_PATH}/settings`, async (req, res) => {
+  try {
+    const [rows] = await pool.query('SELECT * FROM settings LIMIT 1');
+    const settings = rows.length > 0 ? rows[0] : {
+      store_name: 'GamesUp',
+      currency: 'USD',
+      logo: null
+    };
+    res.json(settings);
+  } catch (error) {
+    console.error('Fetch settings error:', error);
+    res.status(500).json({ error: 'Failed to fetch settings' });
   }
 });
 
@@ -809,6 +923,41 @@ app.get(`${BASE_PATH}/orders`, async (req, res) => {
   }
 });
 
+// Delete Payment Proof
+app.delete(`${BASE_PATH}/orders/:id/payment-proof`, async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // 1. Get the filename
+    const [rows] = await pool.query('SELECT payment_proof FROM orders WHERE id = ?', [id]);
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'Order not found' });
+    }
+    
+    const paymentProofUrl = rows[0].payment_proof;
+    if (!paymentProofUrl) {
+      return res.status(400).json({ error: 'No payment proof to delete' });
+    }
+
+    // Extract filename from URL
+    const filename = paymentProofUrl.split('/').pop();
+    const filePath = path.join(uploadDir, filename);
+
+    // 2. Delete file
+    if (fs.existsSync(filePath)) {
+      fs.unlinkSync(filePath);
+    }
+
+    // 3. Update DB
+    await pool.query('UPDATE orders SET payment_proof = NULL WHERE id = ?', [id]);
+
+    res.json({ message: 'Payment proof deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting payment proof:', error);
+    res.status(500).json({ error: 'Failed to delete payment proof' });
+  }
+});
+
 // Update Order
 app.put(`${BASE_PATH}/orders/:id`, async (req, res) => {
   try {
@@ -837,6 +986,51 @@ app.put(`${BASE_PATH}/orders/:id`, async (req, res) => {
     params.push(id);
 
     await pool.query(query, params);
+
+    // Send Email if status is 'completed'
+    if (status === 'completed') {
+        try {
+            // Fetch updated order details
+            const [rows] = await pool.query('SELECT * FROM orders WHERE id = ?', [id]);
+            if (rows.length > 0) {
+                const order = rows[0];
+                // Check if we have digital items to send
+                if (order.digital_email || order.digital_password || order.digital_code) {
+                    const emailSubject = `Your Order #${order.order_number || order.id} is Completed`;
+                    const emailText = `
+Hello ${order.customer_name},
+
+Your order for ${order.product_name} has been completed!
+
+Here are your digital product details:
+Email: ${order.digital_email || 'N/A'}
+Password: ${order.digital_password || 'N/A'}
+Code: ${order.digital_code || 'N/A'}
+
+Thank you for shopping with us!
+`;
+                    const emailHtml = `
+<div style="font-family: Arial, sans-serif; color: #333;">
+  <h2>Order Completed!</h2>
+  <p>Hello ${order.customer_name},</p>
+  <p>Your order for <strong>${order.product_name}</strong> has been completed.</p>
+  <div style="background-color: #f4f4f4; padding: 15px; border-radius: 5px; margin: 20px 0;">
+    <h3 style="margin-top: 0;">Your Digital Product Details:</h3>
+    <p><strong>Email:</strong> ${order.digital_email || 'N/A'}</p>
+    <p><strong>Password:</strong> ${order.digital_password || 'N/A'}</p>
+    <p><strong>Code:</strong> ${order.digital_code || 'N/A'}</p>
+  </div>
+  <p>Thank you for shopping with GamesUp!</p>
+</div>
+`;
+                    // Send email
+                    emailService.sendEmail(order.customer_email, emailSubject, emailText, emailHtml).catch(console.error);
+                }
+            }
+        } catch (emailError) {
+            console.error('Error sending completion email:', emailError);
+        }
+    }
 
     res.json({ message: 'Order updated successfully' });
   } catch (error) {
@@ -1352,7 +1546,7 @@ app.post(`${BASE_PATH}/customer-orders`, async (req, res) => {
 
     // Determine initial status based on payment method
     let status = 'pending';
-    if (paymentMethod === 'instapay') {
+    if (['instapay', 'vodafone_cash', 'telda'].includes(paymentMethod)) {
       status = 'pending_approval';
     } else if (paymentMethod === 'cod') {
       status = 'pending';

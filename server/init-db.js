@@ -10,7 +10,7 @@ async function initDb() {
     host: process.env.DB_HOST || 'localhost',
     user: process.env.DB_USER || 'root',
     password: process.env.DB_PASSWORD,
-    database: process.env.DB_NAME || 'u123456789_gamesup',
+    // database: process.env.DB_NAME || 'u123456789_gamesup', // Don't connect to DB initially
     port: process.env.DB_PORT || 3306,
     multipleStatements: true // Enable multiple statements
   };
@@ -20,6 +20,12 @@ async function initDb() {
   try {
     const connection = await mysql.createConnection(config);
     console.log('Connected!');
+
+    // Create database if it doesn't exist
+    const dbName = process.env.DB_NAME || 'u123456789_gamesup';
+    await connection.query(`CREATE DATABASE IF NOT EXISTS \`${dbName}\``);
+    await connection.query(`USE \`${dbName}\``);
+
 
     const schemaPath = path.join(__dirname, 'schema.sql');
     const schema = fs.readFileSync(schemaPath, 'utf8');
