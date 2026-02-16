@@ -107,6 +107,7 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
 // Serve uploads with proper MIME types
 const uploadDir = path.join(__dirname, 'uploads');
@@ -1412,6 +1413,19 @@ app.get(`${BASE_PATH}/system/categories`, async (req, res) => {
 app.post(`${BASE_PATH}/system/categories`, async (req, res) => {
   try {
     const { name, slug, icon, displayOrder, isActive } = req.body;
+    
+    // Log request body for debugging
+    console.log('Creating category:', req.body);
+    
+    // Validate required fields
+    if (!name || !slug) {
+      return res.status(400).json({ 
+        error: 'Missing required fields', 
+        details: 'Name and slug are required',
+        received: req.body
+      });
+    }
+
     await pool.query(
       'INSERT INTO categories (name, slug, icon, display_order, is_active) VALUES (?, ?, ?, ?, ?)',
       [name, slug, icon, displayOrder || 0, isActive]
@@ -1419,7 +1433,12 @@ app.post(`${BASE_PATH}/system/categories`, async (req, res) => {
     res.json({ message: 'Category created successfully' });
   } catch (error) {
     console.error('Error creating category:', error);
-    res.status(500).json({ error: 'Failed to create category' });
+    res.status(500).json({ 
+      error: 'Failed to create category',
+      details: error.message,
+      code: error.code,
+      sqlMessage: error.sqlMessage
+    });
   }
 });
 
@@ -1470,6 +1489,19 @@ app.get(`${BASE_PATH}/system/subcategories`, async (req, res) => {
 app.post(`${BASE_PATH}/system/subcategories`, async (req, res) => {
   try {
     const { categoryId, name, description, slug, displayOrder, isActive } = req.body;
+    
+    // Log request body for debugging
+    console.log('Creating sub-category:', req.body);
+    
+    // Validate required fields
+    if (!categoryId || !name || !slug) {
+      return res.status(400).json({ 
+        error: 'Missing required fields', 
+        details: 'Category ID, name, and slug are required',
+        received: req.body
+      });
+    }
+
     await pool.query(
       'INSERT INTO sub_categories (category_id, name, description, slug, display_order, is_active) VALUES (?, ?, ?, ?, ?, ?)',
       [categoryId, name, description, slug, displayOrder || 0, isActive]
@@ -1477,7 +1509,12 @@ app.post(`${BASE_PATH}/system/subcategories`, async (req, res) => {
     res.json({ message: 'Sub-category created successfully' });
   } catch (error) {
     console.error('Error creating sub-category:', error);
-    res.status(500).json({ error: 'Failed to create sub-category' });
+    res.status(500).json({ 
+      error: 'Failed to create sub-category',
+      details: error.message,
+      code: error.code,
+      sqlMessage: error.sqlMessage
+    });
   }
 });
 
