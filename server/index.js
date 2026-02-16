@@ -442,7 +442,7 @@ app.get(`${BASE_PATH}/settings`, async (req, res) => {
     res.json(settings);
   } catch (error) {
     console.error('Fetch settings error:', error);
-    res.status(500).json({ error: 'Failed to fetch settings' });
+    res.status(500).json({ error: 'Failed to fetch settings', details: error.message });
   }
 });
 
@@ -472,7 +472,7 @@ app.post(`${BASE_PATH}/settings`, async (req, res) => {
   } catch (error) {
     await connection.rollback();
     console.error('Update settings error:', error);
-    res.status(500).json({ error: 'Failed to update settings' });
+    res.status(500).json({ error: 'Failed to update settings', details: error.message });
   } finally {
     connection.release();
   }
@@ -580,7 +580,7 @@ app.post(`${BASE_PATH}/customer/login`, async (req, res) => {
     });
   } catch (error) {
     console.error('Login error:', error);
-    res.status(500).json({ error: 'Failed to login' });
+    res.status(500).json({ error: 'Failed to login', details: error.message });
   }
 });
 
@@ -1178,7 +1178,7 @@ app.post(`${BASE_PATH}/settings`, async (req, res) => {
     res.json({ message: 'Settings updated successfully' });
   } catch (error) {
     console.error('Error updating settings:', error);
-    res.status(500).json({ error: 'Failed to update settings' });
+    res.status(500).json({ error: 'Failed to update settings', details: error.message });
   }
 });
 
@@ -2282,20 +2282,54 @@ app.get('*', (req, res) => {
   }
 });
 
-app.listen(port, () => {
-  console.log(`🚀 Server running on port ${port}`);
-  console.log(`🌐 Base URL: http://localhost:${port}${BASE_PATH}`);
-  console.log(`❤️  Health check: http://localhost:${port}/`);
-  console.log(`🏓 Ping test: http://localhost:${port}/ping`);
-  console.log(`🔍 Detailed health: http://localhost:${port}${BASE_PATH}/health`);
-}).on('error', (err) => {
-  console.error('❌ Server failed to start:', err.message);
-  if (err.code === 'EADDRINUSE') {
-    console.error(`⚠️  Port ${port} is already in use`);
-  } else if (err.code === 'EACCES') {
-    console.error(`⚠️  Permission denied to bind to port ${port}`);
-  } else {
-    console.error(`⚠️  Error code: ${err.code}`);
+async function runMigrations() {
+  console.log('Checking database migrations...');
+  try {
+    const connection = await pool.getConnection();
+    
+    // 1. Settings Table
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS settings (
+        setting_key VARCHAR(50) PRIMARY KEY,
+        setting_value TEXT
+      )
+    `);
+
+    // 2. Notifications Table
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS notifications (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        title VARCHAR(255) NOT NULL,
+        message TEXT,
+        type VARCHAR(50) DEFAULT 'info',
+        is_read BOOLEAN DEFAULT FALSE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    connection.release();
+    console.log('Migrations check completed.');
+  } catch (error) {
+    console.error('Migration check failed:', error);
   }
-  process.exit(1);
+}
+
+runMigrations().then(() => {
+  app.listen(port, () => {
+    console.log(`🚀 Server running on port ${port}`);
+    console.log(`🌐 Base URL: http://localhost:${port}${BASE_PATH}`);
+    console.log(`❤️  Health check: http://localhost:${port}/`);
+    console.log(`🏓 Ping test: http://localhost:${port}/ping`);
+    console.log(`🔍 Detailed health: http://localhost:${port}${BASE_PATH}/health`);
+  }).on('error', (err) => {
+    console.error('❌ Server failed to start:', err.message);
+    if (err.code === 'EADDRINUSE') {
+      console.error(`⚠️  Port ${port} is already in use`);
+    } else if (err.code === 'EACCES') {
+      console.error(`⚠️  Permission denied to bind to port ${port}`);
+    } else {
+      console.error(`⚠️  Error code: ${err.code}`);
+    }
+    process.exit(1);
+  });
 });
