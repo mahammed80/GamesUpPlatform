@@ -8,36 +8,28 @@ const path = require('path');
 const fs = require('fs');
 const multer = require('multer');
 
-// Load environment variables from the .env file
-const envPath = path.resolve(__dirname, '../.env');
+// Load environment variables
+// Priority: 1. server/.env (local/production specific), 2. root .env (shared/dev)
+const serverEnvPath = path.resolve(__dirname, '.env');
+const rootEnvPath = path.resolve(__dirname, '../.env');
 
-// Remove .env.local if it exists (to prevent conflicts)
-const localEnvPath = path.resolve(__dirname, '../.env.local');
-if (fs.existsSync(localEnvPath)) {
-  console.log('🗑️  Removing .env.local to prevent conflicts...');
-  fs.unlinkSync(localEnvPath);
-  console.log('✅ .env.local removed');
-}
+let envResult;
 
-console.log('Loading .env from:', envPath);
-const result = dotenv.config({ path: envPath });
-
-// If not found, try current directory
-if (result.error && result.error.code === 'ENOENT') {
-  console.log('📁 .env not found in parent, trying current directory...');
-  const currentEnvPath = path.resolve(__dirname, '.env');
-  const currentResult = dotenv.config({ path: currentEnvPath });
-  if (!currentResult.error) {
-    console.log('✅ .env loaded from current directory:', currentEnvPath);
-  } else {
-    console.log('❌ .env not found in current directory either');
-  }
-}
-
-if (result.error) {
-  console.error('Dotenv error:', result.error);
+if (fs.existsSync(serverEnvPath)) {
+  console.log('✅ Loading .env from server directory:', serverEnvPath);
+  envResult = dotenv.config({ path: serverEnvPath });
+} else if (fs.existsSync(rootEnvPath)) {
+  console.log('⚠️  Server .env not found, falling back to root .env:', rootEnvPath);
+  envResult = dotenv.config({ path: rootEnvPath });
 } else {
-  console.log('✅ .env loaded successfully');
+  console.log('❌ No .env file found!');
+  envResult = { error: new Error('No .env file found') };
+}
+
+if (envResult.error) {
+  console.error('Dotenv error:', envResult.error);
+} else {
+  console.log('✅ Environment variables loaded successfully');
 }
 
 const paytabs = require('./services/paytabs');
@@ -1139,48 +1131,7 @@ app.get(`${BASE_PATH}/hr/employees`, async (req, res) => {
   }
 });
 
-// Settings Routes
-app.get(`${BASE_PATH}/settings`, async (req, res) => {
-  try {
-    const [rows] = await pool.query('SELECT * FROM settings');
-    const settings = rows.reduce((acc, row) => {
-      acc[row.setting_key] = row.setting_value;
-      return acc;
-    }, {});
 
-    // Ensure default values if empty
-    if (!settings.currency_code) settings.currency_code = 'USD';
-    if (!settings.currency_symbol) settings.currency_symbol = '$';
-    if (!settings.tax_rate) settings.tax_rate = '8.5';
-
-    res.json(settings);
-  } catch (error) {
-    console.error('Error fetching settings:', error);
-    // Return defaults on error (e.g. table missing)
-    res.json({
-      currency_code: 'USD',
-      currency_symbol: '$',
-      tax_rate: '8.5'
-    });
-  }
-});
-
-app.post(`${BASE_PATH}/settings`, async (req, res) => {
-  try {
-    const settings = req.body;
-    for (const [key, value] of Object.entries(settings)) {
-      const val = typeof value === 'string' ? value : String(value);
-      await pool.query(
-        'INSERT INTO settings (setting_key, setting_value) VALUES (?, ?) ON DUPLICATE KEY UPDATE setting_value = ?',
-        [key, val, val]
-      );
-    }
-    res.json({ message: 'Settings updated successfully' });
-  } catch (error) {
-    console.error('Error updating settings:', error);
-    res.status(500).json({ error: 'Failed to update settings', details: error.message });
-  }
-});
 
 // Orders Route
 app.get(`${BASE_PATH}/orders`, async (req, res) => {
@@ -2307,8 +2258,127 @@ async function runMigrations() {
       )
     `);
 
+    // 3. Categories Table
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS categories (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
+        slug VARCHAR(255) UNIQUE NOT NULL,
+        image_url VARCHAR(255),
+        is_active BOOLEAN DEFAULT TRUE,
+        display_order INT DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // 4. Products Table
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS products (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
+        slug VARCHAR(255) UNIQUE,
+        category_slug VARCHAR(100),
+        price DECIMAL(10, 2),
+        stock INT DEFAULT 0,
+        image VARCHAR(255),
+        description TEXT,
+        digital_items JSON,
+        is_active BOOLEAN DEFAULT TRUE,
+        is_featured BOOLEAN DEFAULT FALSE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // 5. Customers Table
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS customers (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        email VARCHAR(255) UNIQUE NOT NULL,
+        password_hash VARCHAR(255) NOT NULL,
+        name VARCHAR(255),
+        phone VARCHAR(50),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // 6. Users Table (Admins)
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS users (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        email VARCHAR(255) UNIQUE NOT NULL,
+        password_hash VARCHAR(255) NOT NULL,
+        name VARCHAR(255),
+        role VARCHAR(50) DEFAULT 'user',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // 7. Orders Table
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS orders (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        order_number VARCHAR(50) NOT NULL,
+        customer_name VARCHAR(255) NOT NULL,
+        customer_email VARCHAR(255),
+        product_name VARCHAR(255),
+        date DATE,
+        status VARCHAR(50),
+        amount DECIMAL(10, 2),
+        digital_email VARCHAR(255),
+        digital_password VARCHAR(255),
+        digital_code VARCHAR(255),
+        inventory_id VARCHAR(50),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // 8. Employees Table
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS employees (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
+        role VARCHAR(100),
+        department VARCHAR(100),
+        email VARCHAR(255) UNIQUE,
+        phone VARCHAR(50),
+        status VARCHAR(50) DEFAULT 'Active',
+        join_date DATE,
+        salary DECIMAL(10, 2),
+        image VARCHAR(255),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // 9. Attendance Table
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS attendance (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        employee_id INT,
+        date DATE,
+        check_in TIME,
+        check_out TIME,
+        status VARCHAR(50),
+        FOREIGN KEY (employee_id) REFERENCES employees(id)
+      )
+    `);
+    
+    // 10. Banners Table
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS banners (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        title VARCHAR(255) NOT NULL,
+        image_url VARCHAR(255) NOT NULL,
+        link VARCHAR(255),
+        position INT DEFAULT 0,
+        is_active BOOLEAN DEFAULT TRUE,
+        start_date DATE,
+        end_date DATE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
     connection.release();
-    console.log('Migrations check completed.');
+    console.log('Migrations check completed (All tables verified).');
   } catch (error) {
     console.error('Migration check failed:', error);
   }
