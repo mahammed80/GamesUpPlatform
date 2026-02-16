@@ -423,19 +423,91 @@ app.post(`${BASE_PATH}/setup-accounts`, async (req, res) => {
   }
 });
 
-// Store Settings (Missing Endpoint)
+// Store Settings
 app.get(`${BASE_PATH}/settings`, async (req, res) => {
   try {
-    const [rows] = await pool.query('SELECT * FROM settings LIMIT 1');
-    const settings = rows.length > 0 ? rows[0] : {
-      store_name: 'GamesUp',
-      currency: 'USD',
-      logo: null
-    };
+    const [rows] = await pool.query('SELECT * FROM settings');
+    const settings = {};
+    rows.forEach(row => {
+      settings[row.setting_key] = row.setting_value;
+    });
+    
+    // Ensure defaults if empty
+    if (Object.keys(settings).length === 0) {
+       settings.currency_code = 'USD';
+       settings.currency_symbol = '$';
+       settings.tax_rate = '8.5';
+    }
+    
     res.json(settings);
   } catch (error) {
     console.error('Fetch settings error:', error);
     res.status(500).json({ error: 'Failed to fetch settings' });
+  }
+});
+
+app.post(`${BASE_PATH}/settings`, async (req, res) => {
+  const settings = req.body;
+  const connection = await pool.getConnection();
+  
+  try {
+    await connection.beginTransaction();
+    
+    for (const [key, value] of Object.entries(settings)) {
+      let stringValue = value;
+      if (typeof value === 'object' && value !== null) {
+        stringValue = JSON.stringify(value);
+      } else {
+        stringValue = String(value);
+      }
+      
+      await connection.query(
+        'INSERT INTO settings (setting_key, setting_value) VALUES (?, ?) ON DUPLICATE KEY UPDATE setting_value = ?',
+        [key, stringValue, stringValue]
+      );
+    }
+    
+    await connection.commit();
+    res.json({ success: true });
+  } catch (error) {
+    await connection.rollback();
+    console.error('Update settings error:', error);
+    res.status(500).json({ error: 'Failed to update settings' });
+  } finally {
+    connection.release();
+  }
+});
+
+// Notifications
+app.get(`${BASE_PATH}/notifications`, async (req, res) => {
+  try {
+    // Get latest 50 notifications
+    const [rows] = await pool.query('SELECT * FROM notifications ORDER BY created_at DESC LIMIT 50');
+    res.json(rows);
+  } catch (error) {
+    console.error('Fetch notifications error:', error);
+    res.status(500).json({ error: 'Failed to fetch notifications' });
+  }
+});
+
+app.post(`${BASE_PATH}/notifications/:id/read`, async (req, res) => {
+  try {
+    const { id } = req.params;
+    await pool.query('UPDATE notifications SET is_read = TRUE WHERE id = ?', [id]);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Mark notification read error:', error);
+    res.status(500).json({ error: 'Failed to update notification' });
+  }
+});
+
+app.post(`${BASE_PATH}/notifications/read-all`, async (req, res) => {
+  try {
+    await pool.query('UPDATE notifications SET is_read = TRUE');
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Mark all notifications read error:', error);
+    res.status(500).json({ error: 'Failed to update notifications' });
   }
 });
 
@@ -509,6 +581,191 @@ app.post(`${BASE_PATH}/customer/login`, async (req, res) => {
   } catch (error) {
     console.error('Login error:', error);
     res.status(500).json({ error: 'Failed to login' });
+  }
+});
+
+// Customer Orders (Create - POS/Checkout)
+app.post(`${BASE_PATH}/customer-orders`, async (req, res) => {
+  const connection = await pool.getConnection();
+  try {
+    await connection.beginTransaction();
+
+    const { customerEmail, customerName, items, total, deliveryMethod, shippingAddress, paymentMethod, paymentProof } = req.body;
+    const orderNumber = `ORD-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+    const purchasedItems = [];
+    const digitalKeys = [];
+
+    // Determine flow and initial status
+    const isPOS = !paymentMethod;
+    const isManualPayment = ['cod', 'instapay', 'vodafone_cash', 'telda'].includes(paymentMethod);
+    const isCard = paymentMethod === 'card';
+    const initialStatus = isPOS ? 'completed' : (isManualPayment ? 'pending' : 'pending_payment');
+
+    // Process each item in the cart
+    for (const item of items) {
+      // Lock the product row for update to prevent race conditions
+      const [productRows] = await connection.query('SELECT * FROM products WHERE id = ? FOR UPDATE', [item.id]);
+      
+      if (productRows.length === 0) {
+        throw new Error(`Product ${item.name} not found`);
+      }
+      
+      const product = productRows[0];
+      let digitalItems = [];
+      try {
+        digitalItems = typeof product.digital_items === 'string' 
+          ? JSON.parse(product.digital_items) 
+          : (product.digital_items || []);
+      } catch (e) {
+        digitalItems = [];
+      }
+      
+      // Capture initial count to determine if it's a digital product
+      const initialDigitalCount = digitalItems.length;
+
+      const quantity = item.quantity || 1;
+      
+      // For each unit purchased
+      // Always assign/reserve keys immediately for ANY order
+      const assignNow = true;
+
+      for (let i = 0; i < quantity; i++) {
+        let assignedKey = null;
+        
+        if (assignNow && digitalItems.length > 0) {
+          assignedKey = digitalItems.shift();
+        }
+        if (assignNow && assignedKey) {
+          digitalKeys.push({
+            productName: product.name,
+            ...assignedKey
+          });
+        }
+
+        // Insert order record
+        await connection.query(
+          `INSERT INTO orders (
+            order_number, customer_name, customer_email, product_name, 
+            date, status, amount, 
+            digital_email, digital_password, digital_code, inventory_id,
+            payment_method, payment_proof
+          ) VALUES (?, ?, ?, ?, NOW(), ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            orderNumber, 
+            customerName, 
+            customerEmail, 
+            product.name,
+            initialStatus, 
+            product.price, 
+            assignNow && assignedKey ? assignedKey.email : null,
+            assignNow && assignedKey ? assignedKey.password : null,
+            assignNow && assignedKey ? assignedKey.code : null,
+            isPOS ? 'POS' : null,
+            paymentMethod || null,
+            paymentProof || null
+          ]
+        );
+
+        purchasedItems.push({
+          ...item,
+          digital_key: assignNow ? assignedKey : null
+        });
+      }
+      
+      // Update product inventory and stock for ANY order
+      if (assignNow) {
+        // If it was digital (had keys initially) or still has keys, sync stock to keys.
+        // Otherwise treat as physical.
+        const isDigital = initialDigitalCount > 0 || digitalItems.length > 0;
+        const newStock = isDigital ? digitalItems.length : Math.max(0, product.stock - quantity);
+
+        await connection.query(
+          'UPDATE products SET digital_items = ?, stock = ? WHERE id = ?',
+          [JSON.stringify(digitalItems), newStock, product.id]
+        );
+      }
+    }
+
+    await connection.commit();
+
+    // Send Email to Customer
+    // ONLY send if status is completed (i.e., not pending verification)
+    if (initialStatus === 'completed') {
+        try {
+            if (digitalKeys.length > 0) {
+                const emailSubject = `Your Order #${orderNumber} from GamesUp`;
+                
+                let keysHtml = '';
+                digitalKeys.forEach(key => {
+                    keysHtml += `
+                    <div style="background-color: #f4f4f4; padding: 15px; border-radius: 5px; margin-bottom: 10px;">
+                        <h4 style="margin-top: 0;">${key.productName}</h4>
+                        <p><strong>Email:</strong> ${key.email || 'N/A'}</p>
+                        <p><strong>Password:</strong> ${key.password || 'N/A'}</p>
+                        <p><strong>Code:</strong> <span style="font-family: monospace; background: #eee; padding: 2px 5px;">${key.code || 'N/A'}</span></p>
+                        <p><span style="background-color: #e0f2fe; color: #0369a1; padding: 2px 6px; border-radius: 4px; font-size: 0.8em;">${isPOS ? 'POS Order' : 'Online Order'}</span></p>
+                    </div>`;
+                });
+
+                const emailHtml = `
+                <div style="font-family: Arial, sans-serif; color: #333;">
+                  <h2>Order Confirmation</h2>
+                  <p>Hello ${customerName},</p>
+                  <p>Thank you for your purchase at our store!</p>
+                  <p><strong>Order Number:</strong> ${orderNumber}</p>
+                  <p><strong>Total:</strong> $${total.toFixed(2)}</p>
+                  
+                  <h3 style="margin-top: 20px;">Your Digital Items:</h3>
+                  ${keysHtml}
+                  
+                  <p>If you have any questions, please ask our staff.</p>
+                </div>
+                `;
+                
+                const emailText = `Hello ${customerName},\n\nThank you for your purchase! Order: ${orderNumber}\n\nYour digital items are attached in this email.`;
+
+                await emailService.sendEmail(customerEmail, emailSubject, emailText, emailHtml);
+            }
+        } catch (emailError) {
+            console.error('Failed to send completed order email:', emailError);
+            // Don't fail the request if email fails, as the order is already committed
+        }
+    } else {
+        // Optional: Send "Order Received" email for pending orders
+        try {
+             const emailSubject = `Order Received #${orderNumber} - GamesUp`;
+             const emailHtml = `
+                <div style="font-family: Arial, sans-serif; color: #333;">
+                  <h2>Order Received</h2>
+                  <p>Hello ${customerName},</p>
+                  <p>Thank you for your order! We have received your request.</p>
+                  <p><strong>Order Number:</strong> ${orderNumber}</p>
+                  <p><strong>Total:</strong> $${total.toFixed(2)}</p>
+                  <p><strong>Payment Method:</strong> ${paymentMethod || 'POS'}</p>
+                  <p><strong>Status:</strong> ${isCard ? 'Pending Payment' : 'Pending Verification'}</p>
+                  
+                  <p>We will verify your payment and send you the digital items shortly.</p>
+                </div>
+             `;
+             const emailText = `Hello ${customerName},\n\nThank you for your order #${orderNumber}. We have received your request and will verify your payment shortly.`;
+             await emailService.sendEmail(customerEmail, emailSubject, emailText, emailHtml);
+        } catch (e) {
+            console.error('Failed to send pending order email', e);
+        }
+    }
+
+    res.json({ 
+        success: true, 
+        orderNumber, 
+        purchasedItems 
+    });
+
+  } catch (error) {
+    await connection.rollback();
+    console.error('Error creating POS order:', error);
+    res.status(500).json({ error: 'Failed to create order' });
+  } finally {
+    connection.release();
   }
 });
 
@@ -646,7 +903,7 @@ app.post(`${BASE_PATH}/payment/create`, async (req, res) => {
   }
 });
 
-// Verify Payment and Create Shipment
+// Verify Payment and finalize order (assign keys and send completion email)
 app.post(`${BASE_PATH}/payment/verify`, async (req, res) => {
   try {
     const { tranRef, orderNumber } = req.body;
@@ -655,28 +912,78 @@ app.post(`${BASE_PATH}/payment/verify`, async (req, res) => {
     const verification = await paytabs.verifyPayment(tranRef);
 
     if (verification.success) {
-      // 2. Update Order Status
-      await pool.query(
-        'UPDATE orders SET status = ? WHERE order_number = ?',
-        ['paid', orderNumber]
-      );
-
-      // 3. Get Order Details for Shipment
-      // In a real app, we'd fetch from DB. Here we might need to pass details or fetch them.
-      // Fetching from DB:
+      // 2. Fetch order rows
       const [orderRows] = await pool.query('SELECT * FROM orders WHERE order_number = ?', [orderNumber]);
-      if (orderRows.length > 0) {
-        // Construct order object for OTO
-        const firstRow = orderRows[0];
-        // We need shipping address which we might not have stored fully in `orders` table in the simple schema
-        // But let's assume we can proceed or skip OTO if data missing
-
-        // Ideally, we should have stored the full address. 
-        // For now, let's assume we can't do full OTO automation without address in DB.
-        // But we can try if we passed it in body, or just log it.
+      if (orderRows.length === 0) {
+        return res.status(404).json({ success: false, message: 'Order not found' });
       }
 
-      // Return success
+      const customerName = orderRows[0].customer_name;
+      const customerEmail = orderRows[0].customer_email;
+      const totalAmount = orderRows.reduce((sum, r) => sum + (typeof r.amount === 'string' ? parseFloat(r.amount.replace('$','')) : r.amount), 0);
+
+      // 3. Assign keys for rows lacking digital data and mark as completed
+      const keysAssigned = [];
+      for (const row of orderRows) {
+        if (!row.digital_email && !row.digital_password && !row.digital_code) {
+          const [productRows] = await pool.query('SELECT * FROM products WHERE name = ? FOR UPDATE', [row.product_name]);
+          if (productRows.length === 0) continue;
+          const product = productRows[0];
+          let digitalItems = [];
+          try {
+            digitalItems = typeof product.digital_items === 'string' ? JSON.parse(product.digital_items) : (product.digital_items || []);
+          } catch (e) {
+            digitalItems = [];
+          }
+          if (digitalItems.length === 0) continue;
+          const assignedKey = digitalItems.shift();
+          // Sync stock with remaining digital items count
+          const newStock = digitalItems.length;
+          await pool.query('UPDATE products SET digital_items = ?, stock = ? WHERE id = ?', [JSON.stringify(digitalItems), newStock, product.id]);
+          await pool.query('UPDATE orders SET digital_email = ?, digital_password = ?, digital_code = ?, status = ? WHERE id = ?', [assignedKey.email || null, assignedKey.password || null, assignedKey.code || null, 'completed', row.id]);
+          keysAssigned.push({ productName: row.product_name, ...assignedKey });
+        } else {
+          // Keys already assigned (reserved during pending)
+          await pool.query('UPDATE orders SET status = ? WHERE id = ?', ['completed', row.id]);
+          keysAssigned.push({ 
+             productName: row.product_name, 
+             email: row.digital_email, 
+             password: row.digital_password, 
+             code: row.digital_code 
+          });
+        }
+      }
+
+      // 4. Send completion email
+      if (keysAssigned.length > 0) {
+        const emailSubject = `Your Order #${orderNumber} is Completed`;
+        let keysHtml = '';
+        keysAssigned.forEach(key => {
+          keysHtml += `
+            <div style="background-color: #f4f4f4; padding: 15px; border-radius: 5px; margin-bottom: 10px;">
+              <h4 style="margin-top: 0;">${key.productName}</h4>
+              <p><strong>Email:</strong> ${key.email || 'N/A'}</p>
+              <p><strong>Password:</strong> ${key.password || 'N/A'}</p>
+              <p><strong>Code:</strong> <span style="font-family: monospace; background: #eee; padding: 2px 5px;">${key.code || 'N/A'}</span></p>
+            </div>`;
+        });
+        const emailHtml = `
+          <div style="font-family: Arial, sans-serif; color: #333;">
+            <h2>Order Completed!</h2>
+            <p>Hello ${customerName},</p>
+            <p>Your payment has been verified and your order is completed.</p>
+            <p><strong>Order Number:</strong> ${orderNumber}</p>
+            <p><strong>Total:</strong> $${totalAmount.toFixed(2)}</p>
+            <h3 style="margin-top: 20px;">Your Digital Items:</h3>
+            ${keysHtml}
+            <p>Thank you for shopping with GamesUp!</p>
+          </div>
+        `;
+        const emailText = `Hello ${customerName},\n\nYour order ${orderNumber} is completed. Your digital items are included.`;
+        await emailService.sendEmail(customerEmail, emailSubject, emailText, emailHtml);
+      }
+
+      res.json({ success: true, message: 'Payment verified, order completed, and email sent' });
       res.json({ success: true, message: 'Payment verified and order processed' });
     } else {
       res.status(400).json({ success: false, message: 'Payment verification failed' });
@@ -686,7 +993,6 @@ app.post(`${BASE_PATH}/payment/verify`, async (req, res) => {
     res.status(500).json({ error: 'Failed to verify payment' });
   }
 });
-
 // Products Route
 app.get(`${BASE_PATH}/products`, async (req, res) => {
   try {
@@ -753,19 +1059,24 @@ app.get(`${BASE_PATH}/products`, async (req, res) => {
 // Create Product
 app.post(`${BASE_PATH}/products`, async (req, res) => {
   try {
-    const { name, category, subCategory, price, cost, stock, image, description, attributes, digitalItems } = req.body;
-
-    // Clean price and cost (remove $ if present)
+      const { name, category, subCategory, price, cost, stock, image, description, attributes, digitalItems } = req.body;
+      
+      // Clean price and cost (remove $ if present)
     const priceValue = typeof price === 'string' ? parseFloat(price.replace('$', '')) : price;
     const costValue = typeof cost === 'string' ? parseFloat(cost.replace('$', '')) : (cost || 0);
     const categorySlug = category ? category.toLowerCase() : 'games';
     const subCategorySlug = subCategory || null;
-    const digitalItemsJson = JSON.stringify(digitalItems || []);
+    
+    // Ensure stock is linked to digital items count if digital items exist
+    const digitalList = digitalItems || [];
+    const finalStock = digitalList.length > 0 ? digitalList.length : stock;
+    
+    const digitalItemsJson = JSON.stringify(digitalList);
     const attributesJson = JSON.stringify(attributes || {});
 
     const [result] = await pool.query(
       'INSERT INTO products (name, category_slug, sub_category_slug, price, cost, stock, image, description, attributes, digital_items) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [name, categorySlug, subCategorySlug, priceValue, costValue, stock, image, description || '', attributesJson, digitalItemsJson]
+      [name, categorySlug, subCategorySlug, priceValue, costValue, finalStock, image, description || '', attributesJson, digitalItemsJson]
     );
 
     res.json({ id: result.insertId, message: 'Product created successfully' });
@@ -785,12 +1096,17 @@ app.put(`${BASE_PATH}/products/:id`, async (req, res) => {
     const costValue = typeof cost === 'string' ? parseFloat(cost.replace('$', '')) : (cost || 0);
     const categorySlug = category ? category.toLowerCase() : 'games';
     const subCategorySlug = subCategory || null;
-    const digitalItemsJson = JSON.stringify(digitalItems || []);
+    
+    // Ensure stock is linked to digital items count if digital items exist
+    const digitalList = digitalItems || [];
+    const finalStock = digitalList.length > 0 ? digitalList.length : stock;
+    
+    const digitalItemsJson = JSON.stringify(digitalList);
     const attributesJson = JSON.stringify(attributes || {});
 
     await pool.query(
       'UPDATE products SET name=?, category_slug=?, sub_category_slug=?, price=?, cost=?, stock=?, image=?, description=?, attributes=?, digital_items=? WHERE id=?',
-      [name, categorySlug, subCategorySlug, priceValue, costValue, stock, image, description || '', attributesJson, digitalItemsJson, id]
+      [name, categorySlug, subCategorySlug, priceValue, costValue, finalStock, image, description || '', attributesJson, digitalItemsJson, id]
     );
 
     res.json({ message: 'Product updated successfully' });
@@ -869,7 +1185,7 @@ app.post(`${BASE_PATH}/settings`, async (req, res) => {
 // Orders Route
 app.get(`${BASE_PATH}/orders`, async (req, res) => {
   try {
-    const { status, search, email } = req.query;
+    const { status, search, email, product } = req.query;
     let query = 'SELECT * FROM orders';
     const params = [];
     const conditions = [];
@@ -883,10 +1199,16 @@ app.get(`${BASE_PATH}/orders`, async (req, res) => {
       conditions.push('customer_email = ?');
       params.push(email);
     }
+    
+    if (product && product !== 'All') {
+      conditions.push('product_name = ?');
+      params.push(product);
+    }
 
     if (search) {
-      conditions.push('(order_number LIKE ? OR customer_name LIKE ?)');
-      params.push(`%${search}%`, `%${search}%`);
+      // Enhanced search: order_number, customer_name, customer_email, product_name, digital_code
+      conditions.push('(order_number LIKE ? OR customer_name LIKE ? OR customer_email LIKE ? OR product_name LIKE ? OR digital_code LIKE ?)');
+      params.push(`%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`);
     }
 
     if (conditions.length > 0) {
@@ -987,13 +1309,35 @@ app.put(`${BASE_PATH}/orders/:id`, async (req, res) => {
 
     await pool.query(query, params);
 
-    // Send Email if status is 'completed'
+    // When marking completed, allocate key if missing and send email
     if (status === 'completed') {
         try {
-            // Fetch updated order details
             const [rows] = await pool.query('SELECT * FROM orders WHERE id = ?', [id]);
             if (rows.length > 0) {
                 const order = rows[0];
+                // Allocate key if missing
+                if (!order.digital_email && !order.digital_password && !order.digital_code) {
+                    const [productRows] = await pool.query('SELECT * FROM products WHERE name = ? FOR UPDATE', [order.product_name]);
+                    if (productRows.length > 0) {
+                        const productRow = productRows[0];
+                        let digitalItems = [];
+                        try {
+                            digitalItems = typeof productRow.digital_items === 'string' ? JSON.parse(productRow.digital_items) : (productRow.digital_items || []);
+                        } catch (e) {
+                            digitalItems = [];
+                        }
+                        if (digitalItems.length > 0) {
+                            const assignedKey = digitalItems.shift();
+                            // Sync stock with remaining digital items count
+                            const newStock = digitalItems.length;
+                            await pool.query('UPDATE products SET digital_items = ?, stock = ? WHERE id = ?', [JSON.stringify(digitalItems), newStock, productRow.id]);
+                            await pool.query('UPDATE orders SET digital_email = ?, digital_password = ?, digital_code = ? WHERE id = ?', [assignedKey.email || null, assignedKey.password || null, assignedKey.code || null, id]);
+                            order.digital_email = assignedKey.email || null;
+                            order.digital_password = assignedKey.password || null;
+                            order.digital_code = assignedKey.code || null;
+                        }
+                    }
+                }
                 // Check if we have digital items to send
                 if (order.digital_email || order.digital_password || order.digital_code) {
                     const emailSubject = `Your Order #${order.order_number || order.id} is Completed`;
@@ -1018,7 +1362,7 @@ Thank you for shopping with us!
     <h3 style="margin-top: 0;">Your Digital Product Details:</h3>
     <p><strong>Email:</strong> ${order.digital_email || 'N/A'}</p>
     <p><strong>Password:</strong> ${order.digital_password || 'N/A'}</p>
-    <p><strong>Code:</strong> ${order.digital_code || 'N/A'}</p>
+    <p><strong>Code:</strong> <span style="font-family: monospace; letter-spacing: 1px; background: #eee; padding: 2px 5px; rounded: 3px;">${order.digital_code || 'N/A'}</span></p>
   </div>
   <p>Thank you for shopping with GamesUp!</p>
 </div>
@@ -1414,6 +1758,87 @@ app.get(`${BASE_PATH}/admin/users`, async (req, res) => {
   }
 });
 
+// Admin Product Overview Route
+app.get(`${BASE_PATH}/admin/product-overview`, async (req, res) => {
+  try {
+    const { productId } = req.query;
+    if (!productId) {
+      return res.status(400).json({ error: 'Product ID is required' });
+    }
+
+    // 1. Get Product Details
+    const [productRows] = await pool.query('SELECT id, name, image, digital_items FROM products WHERE id = ?', [productId]);
+    if (productRows.length === 0) {
+      return res.status(404).json({ error: 'Product not found' });
+    }
+    const product = productRows[0];
+
+    // 2. Parse digital items (remaining inventory)
+    let remainingItems = [];
+    try {
+      remainingItems = typeof product.digital_items === 'string' 
+        ? JSON.parse(product.digital_items) 
+        : (product.digital_items || []);
+    } catch (e) {
+      remainingItems = [];
+    }
+
+    // 3. Get Sold Items (from orders)
+    // We search by product name since orders store product_name
+    const [orderRows] = await pool.query(`
+      SELECT id, order_number, customer_name, customer_email, date, 
+             digital_email, digital_password, digital_code 
+      FROM orders 
+      WHERE product_name = ? 
+      ORDER BY date DESC
+    `, [product.name]);
+
+    const soldItems = orderRows.map(row => ({
+      orderId: row.id,
+      orderNumber: row.order_number || `ORD-${row.id}`,
+      customerName: row.customer_name,
+      customerEmail: row.customer_email,
+      date: row.date,
+      email: row.digital_email,
+      password: row.digital_password,
+      code: row.digital_code
+    }));
+
+    // 4. Extract unique customers
+    const customerMap = new Map();
+    soldItems.forEach(item => {
+      if (!customerMap.has(item.customerEmail)) {
+        customerMap.set(item.customerEmail, {
+          name: item.customerName,
+          email: item.customerEmail,
+          date: item.date,
+          orderNumber: item.orderNumber
+        });
+      }
+    });
+    const customers = Array.from(customerMap.values());
+
+    res.json({
+      product: {
+        id: product.id,
+        name: product.name,
+        image: product.image
+      },
+      stats: {
+        totalSold: soldItems.length,
+        totalRemaining: remainingItems.length
+      },
+      remainingItems: remainingItems,
+      soldItems: soldItems,
+      customers: customers
+    });
+
+  } catch (error) {
+    console.error('Error fetching product overview:', error);
+    res.status(500).json({ error: 'Failed to fetch product overview' });
+  }
+});
+
 app.post(`${BASE_PATH}/admin/users`, async (req, res) => {
   try {
     const { email, password, name, role, job_title, phone, avatar, identity_document } = req.body;
@@ -1629,6 +2054,54 @@ app.post(`${BASE_PATH}/customer-orders`, async (req, res) => {
 
     await connection.commit();
 
+    // Send email to customer
+    try {
+        const emailSubject = `Order Confirmation #${orderNumber}`;
+        const emailText = `Thank you for your order, ${customerName}! Your order #${orderNumber} has been placed successfully.`;
+        
+        let itemsHtml = purchasedItems.map(item => `
+            <div style="border: 1px solid #eee; padding: 15px; margin-bottom: 10px; border-radius: 5px;">
+                <h3 style="margin: 0 0 10px 0;">${item.name}</h3>
+                <p style="margin: 0;">Price: ${item.price}</p>
+                ${item.digitalItem ? `
+                    <div style="margin-top: 10px; background: #f9f9f9; padding: 10px; border-radius: 4px;">
+                        ${item.digitalItem.code ? `<p><strong>Code:</strong> ${item.digitalItem.code}</p>` : ''}
+                        ${item.digitalItem.email ? `<p><strong>Email:</strong> ${item.digitalItem.email}</p>` : ''}
+                        ${item.digitalItem.password ? `<p><strong>Password:</strong> ${item.digitalItem.password}</p>` : ''}
+                    </div>
+                ` : ''}
+            </div>
+        `).join('');
+
+        const emailHtml = `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                <h1 style="color: #333;">Order Confirmation</h1>
+                <p>Hello ${customerName},</p>
+                <p>Thank you for your purchase. Here are your order details:</p>
+                
+                <div style="background: #f5f5f5; padding: 15px; border-radius: 5px; margin: 20px 0;">
+                    <p><strong>Order Number:</strong> ${orderNumber}</p>
+                    <p><strong>Date:</strong> ${new Date().toLocaleString()}</p>
+                    <p><strong>Total:</strong> ${total}</p>
+                </div>
+
+                <h2>Your Items</h2>
+                ${itemsHtml}
+
+                <div style="margin-top: 30px; border-top: 1px solid #eee; padding-top: 20px;">
+                    <p>If you have any questions, please contact our support team.</p>
+                </div>
+            </div>
+        `;
+
+        emailService.sendEmail(customerEmail, emailSubject, emailText, emailHtml).catch(err => {
+            console.error('Failed to send order confirmation email:', err);
+        });
+
+    } catch (emailError) {
+        console.error('Error preparing email:', emailError);
+    }
+
     res.json({
       message: 'Order placed successfully',
       orderNumber,
@@ -1717,6 +2190,84 @@ app.get(`${BASE_PATH}/admin/sold-products`, async (req, res) => {
   } catch (error) {
     console.error('Error fetching sold products:', error);
     res.status(500).json({ error: 'Failed to fetch sold products' });
+  }
+});
+
+// Get Product Data Overview (Admin)
+app.get(`${BASE_PATH}/admin/product-overview`, async (req, res) => {
+  try {
+    const { productId } = req.query;
+    
+    if (!productId) {
+      return res.status(400).json({ error: 'Product ID is required' });
+    }
+
+    // 1. Get Product Details & Remaining Inventory
+    const [products] = await pool.query('SELECT * FROM products WHERE id = ?', [productId]);
+    
+    if (products.length === 0) {
+      return res.status(404).json({ error: 'Product not found' });
+    }
+
+    const product = products[0];
+    let remainingItems = [];
+    try {
+      remainingItems = typeof product.digital_items === 'string'
+        ? JSON.parse(product.digital_items)
+        : (product.digital_items || []);
+    } catch (e) {
+      remainingItems = [];
+    }
+
+    // 2. Get Sold Items (from orders)
+    // Note: Orders link by product_name currently
+    const [orders] = await pool.query(
+      `SELECT 
+        id, order_number, customer_name, customer_email, date, 
+        digital_email, digital_password, digital_code 
+       FROM orders 
+       WHERE product_name = ? AND (digital_code IS NOT NULL OR digital_email IS NOT NULL OR digital_password IS NOT NULL)
+       ORDER BY date DESC`,
+      [product.name]
+    );
+
+    const soldItems = orders.map(order => ({
+      orderId: order.id,
+      orderNumber: order.order_number,
+      customerName: order.customer_name,
+      customerEmail: order.customer_email,
+      date: order.date,
+      email: order.digital_email,
+      password: order.digital_password,
+      code: order.digital_code
+    }));
+
+    // 3. Aggregate Customer Data
+    const customers = orders.map(order => ({
+      name: order.customer_name,
+      email: order.customer_email,
+      date: order.date,
+      orderNumber: order.order_number
+    }));
+
+    res.json({
+      product: {
+        id: product.id,
+        name: product.name,
+        image: product.image
+      },
+      stats: {
+        totalSold: soldItems.length,
+        totalRemaining: remainingItems.length
+      },
+      remainingItems, // List of {email, password, code} in stock
+      soldItems,      // List of sold items with order details
+      customers       // List of customers who bought this
+    });
+
+  } catch (error) {
+    console.error('Error fetching product overview:', error);
+    res.status(500).json({ error: 'Failed to fetch product overview' });
   }
 });
 

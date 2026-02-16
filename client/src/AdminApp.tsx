@@ -5,6 +5,7 @@ import { TopBar } from './components/TopBar';
 import { Login } from './components/Login';
 import { Dashboard } from './components/screens/Dashboard';
 import { Products } from './components/screens/Products';
+import { ProductDataOverview } from './components/screens/ProductDataOverview';
 import { Orders } from './components/screens/Orders';
 import { Analytics } from './components/screens/Analytics';
 import { Customers } from './components/screens/Customers';
@@ -23,7 +24,7 @@ import { EmailTemplates } from './components/screens/EmailTemplates';
 import { setAccessToken } from './utils/api';
 import { projectId } from './utils/supabase/info';
 
-export type Screen = 'dashboard' | 'products' | 'orders' | 'sold-products' | 'analytics' | 'customers' | 'tasks' | 'team' | 'settings' | 'roles' | 'outlook' | 'banners' | 'hr' | 'pos' | 'system' | 'delivery' | 'email-templates';
+export type Screen = 'dashboard' | 'products' | 'data-overview' | 'orders' | 'sold-products' | 'analytics' | 'customers' | 'tasks' | 'team' | 'settings' | 'roles' | 'outlook' | 'banners' | 'hr' | 'pos' | 'system' | 'delivery' | 'email-templates';
 
 export default function AdminApp() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -121,6 +122,7 @@ export default function AdminApp() {
               <Route path="/" element={<Navigate to="dashboard" replace />} />
               <Route path="dashboard" element={<Dashboard />} />
               <Route path="products" element={<Products />} />
+              <Route path="data-overview" element={<ProductDataOverview />} />
               <Route path="orders" element={<Orders />} />
               <Route path="sold-products" element={<SoldProducts />} />
               <Route path="pos" element={<POSNew />} />

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Search, Eye, Download, FileText, Printer, X } from 'lucide-react';
 import { Card } from '../ui/card';
-import { ordersAPI, api } from '../../utils/api';
+import { ordersAPI, api, productsAPI } from '../../utils/api';
 import { useStoreSettings } from '../../context/StoreSettingsContext';
 import { QuickEditCell } from '../ui/QuickEditCell';
 import html2canvas from 'html2canvas';
@@ -32,21 +32,37 @@ export function Orders() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
+  const [productFilter, setProductFilter] = useState('All');
+  const [productsList, setProductsList] = useState<{ id: string | number; name: string }[]>([]);
   const [showInvoice, setShowInvoice] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
   const [viewingProof, setViewingProof] = useState<string | null>(null);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
 
   useEffect(() => {
+    loadProducts();
+  }, []);
+
+  const loadProducts = async () => {
+    try {
+      const data = await productsAPI.getAll();
+      setProductsList(data.products || []);
+    } catch (err) {
+      console.error('Failed to load products:', err);
+    }
+  };
+
+  useEffect(() => {
     loadOrders();
-  }, [searchQuery, statusFilter]);
+  }, [searchQuery, statusFilter, productFilter]);
 
   const loadOrders = async () => {
     try {
       setLoading(true);
       const data = await ordersAPI.getAll({ 
         status: statusFilter,
-        search: searchQuery 
+        search: searchQuery,
+        product: productFilter
       });
       setOrders(data.orders || []);
     } catch (err) {
@@ -76,15 +92,6 @@ export function Orders() {
 
   const handleViewProof = async (id: string, url: string) => {
     setViewingProof(url);
-    
-    // Delete the proof from server (viewed once)
-    try {
-      await api.delete(`/orders/${id}/payment-proof`);
-      // Update local state to remove the proof button
-      setOrders(prev => prev.map(o => o.id === id ? { ...o, payment_proof: undefined } : o));
-    } catch (err) {
-      console.error('Failed to delete proof:', err);
-    }
   };
 
   const handleViewDetails = (order: Order) => {
@@ -141,19 +148,19 @@ export function Orders() {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'completed':
-        return 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400';
+        return 'bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-300 border border-green-200 dark:border-green-800';
       case 'pending':
-        return 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400';
+        return 'bg-yellow-100 dark:bg-yellow-900/50 text-yellow-800 dark:text-yellow-300 border border-yellow-200 dark:border-yellow-800';
       case 'pending_approval':
-        return 'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400';
+        return 'bg-orange-100 dark:bg-orange-900/50 text-orange-800 dark:text-orange-300 border border-orange-200 dark:border-orange-800';
       case 'processing':
-        return 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400';
+        return 'bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-300 border border-blue-200 dark:border-blue-800';
       case 'shipped':
-        return 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400';
+        return 'bg-purple-100 dark:bg-purple-900/50 text-purple-800 dark:text-purple-300 border border-purple-200 dark:border-purple-800';
       case 'cancelled':
-        return 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400';
+        return 'bg-red-100 dark:bg-red-900/50 text-red-800 dark:text-red-300 border border-red-200 dark:border-red-800';
       default:
-        return 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-400';
+        return 'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-300 border border-gray-200 dark:border-gray-700';
     }
   };
 
@@ -217,6 +224,18 @@ export function Orders() {
             />
           </div>
           <select
+            value={productFilter}
+            onChange={(e) => setProductFilter(e.target.value)}
+            className="px-4 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="All">All Products</option>
+            {productsList.map((p) => (
+              <option key={p.id} value={p.name}>
+                {p.name}
+              </option>
+            ))}
+          </select>
+          <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
             className="px-4 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -244,6 +263,8 @@ export function Orders() {
                 <th className="text-left py-3 px-4 text-sm font-medium text-gray-500 dark:text-gray-400">Digital Password</th>
                 <th className="text-left py-3 px-4 text-sm font-medium text-gray-500 dark:text-gray-400">Digital Code</th>
                 <th className="text-left py-3 px-4 text-sm font-medium text-gray-500 dark:text-gray-400">Inventory ID</th>
+                <th className="text-left py-3 px-4 text-sm font-medium text-gray-500 dark:text-gray-400">Payment Method</th>
+                <th className="text-left py-3 px-4 text-sm font-medium text-gray-500 dark:text-gray-400">Proof</th>
                 <th className="text-left py-3 px-4 text-sm font-medium text-gray-500 dark:text-gray-400">Date</th>
                 <th className="text-left py-3 px-4 text-sm font-medium text-gray-500 dark:text-gray-400">Status</th>
                 <th className="text-left py-3 px-4 text-sm font-medium text-gray-500 dark:text-gray-400">Amount</th>
@@ -282,29 +303,38 @@ export function Orders() {
                         <p className="text-xs text-gray-400 dark:text-gray-500">{order.items} item(s)</p>
                       </div>
                     </td>
-                    <td className="py-4 px-4 text-sm text-gray-600 dark:text-gray-300">
+                    <td className="py-4 px-4 text-sm text-gray-600 dark:text-gray-300 truncate max-w-[100px]">
                       <QuickEditCell
                         value={order.digital_email || ''}
                         onSave={(val) => updateOrder(order.id, { digital_email: String(val) })}
+                        className="truncate block"
                       />
                     </td>
-                    <td className="py-4 px-4 text-sm text-gray-600 dark:text-gray-300">
+                    <td className="py-4 px-4 text-sm text-gray-600 dark:text-gray-300 truncate max-w-[100px]">
                       <QuickEditCell
                         value={order.digital_password || ''}
                         onSave={(val) => updateOrder(order.id, { digital_password: String(val) })}
+                        className="truncate block"
                       />
                     </td>
-                    <td className="py-4 px-4 text-sm text-gray-600 dark:text-gray-300">
+                    <td className="py-4 px-4 text-sm font-mono text-gray-600 dark:text-gray-300 truncate max-w-[100px]">
                       <QuickEditCell
                         value={order.digital_code || ''}
                         onSave={(val) => updateOrder(order.id, { digital_code: String(val) })}
+                        className="truncate block"
                       />
                     </td>
                     <td className="py-4 px-4 text-sm text-gray-600 dark:text-gray-300">
-                      <QuickEditCell
-                        value={order.inventory_id || ''}
-                        onSave={(val) => updateOrder(order.id, { inventory_id: String(val) })}
-                      />
+                      {order.inventory_id === 'POS' ? (
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300">
+                          POS
+                        </span>
+                      ) : (
+                        <QuickEditCell
+                          value={order.inventory_id || ''}
+                          onSave={(val) => updateOrder(order.id, { inventory_id: String(val) })}
+                        />
+                      )}
                     </td>
                     <td className="py-4 px-4 text-sm text-gray-600 dark:text-gray-300">
                       <span className="capitalize">{order.payment_method?.replace('_', ' ') || 'N/A'}</span>

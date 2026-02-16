@@ -688,9 +688,19 @@ export function Products() {
               type="number"
               value={formData.stock}
               onChange={(e) => setFormData({ ...formData, stock: parseInt(e.target.value) || 0 })}
-              className="w-full px-4 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-red-500"
+              disabled={formData.digitalItems.length > 0}
+              className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 ${
+                formData.digitalItems.length > 0 
+                  ? 'bg-gray-100 dark:bg-gray-800 text-gray-500 cursor-not-allowed border-gray-200 dark:border-gray-700' 
+                  : 'bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white border-gray-200 dark:border-gray-600'
+              }`}
               placeholder="0"
             />
+            {formData.digitalItems.length > 0 && (
+              <p className="mt-1 text-xs text-blue-600 dark:text-blue-400">
+                Stock is automatically calculated from the number of digital items.
+              </p>
+            )}
           </div>
           
           <div>

@@ -6,9 +6,10 @@ interface QuickEditCellProps {
   type?: string;
   prefix?: string;
   options?: string[];
+  className?: string;
 }
 
-export const QuickEditCell = ({ value, onSave, type = "text", prefix = "", options }: QuickEditCellProps) => {
+export const QuickEditCell = ({ value, onSave, type = "text", prefix = "", options, className = "" }: QuickEditCellProps) => {
   const [isEditing, setIsEditing] = useState(false);
   const [currentValue, setCurrentValue] = useState(value);
 
@@ -62,7 +63,10 @@ export const QuickEditCell = ({ value, onSave, type = "text", prefix = "", optio
   }
 
   return (
-    <div onClick={(e) => { e.stopPropagation(); setIsEditing(true); }} className="cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 p-1 rounded border border-transparent hover:border-gray-300 transition-all">
+    <div 
+      onClick={(e) => { e.stopPropagation(); setIsEditing(true); }} 
+      className={`cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 p-1 rounded border border-transparent hover:border-gray-300 transition-all ${className}`}
+    >
       {prefix}{value || '-'}
     </div>
   );

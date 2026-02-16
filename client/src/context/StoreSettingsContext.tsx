@@ -5,6 +5,12 @@ interface StoreSettings {
   currency_code: string;
   currency_symbol: string;
   tax_rate: number;
+  store_name?: string;
+  store_email?: string;
+  store_phone?: string;
+  store_address?: string;
+  business_hours?: { day: string; open: string; close: string }[];
+  payment_methods?: { name: string; enabled: boolean }[];
 }
 
 interface StoreSettingsContextType {
@@ -19,6 +25,12 @@ const defaultSettings: StoreSettings = {
   currency_code: 'USD',
   currency_symbol: '$',
   tax_rate: 8.5,
+  store_name: '',
+  store_email: '',
+  store_phone: '',
+  store_address: '',
+  business_hours: [],
+  payment_methods: [],
 };
 
 const StoreSettingsContext = createContext<StoreSettingsContextType | undefined>(undefined);
@@ -32,10 +44,32 @@ export function StoreSettingsProvider({ children }: { children: ReactNode }) {
       const response = await fetch(`${BASE_URL}/settings`);
       if (response.ok) {
         const data = await response.json();
+        
+        // Parse JSON strings for complex objects
+        let business_hours = [];
+        try {
+          business_hours = data.business_hours ? JSON.parse(data.business_hours) : [];
+        } catch (e) {
+          console.error('Failed to parse business_hours', e);
+        }
+
+        let payment_methods = [];
+        try {
+          payment_methods = data.payment_methods ? JSON.parse(data.payment_methods) : [];
+        } catch (e) {
+          console.error('Failed to parse payment_methods', e);
+        }
+
         setSettings({
           currency_code: data.currency_code || 'USD',
           currency_symbol: data.currency_symbol || '$',
           tax_rate: parseFloat(data.tax_rate) || 0,
+          store_name: data.store_name || '',
+          store_email: data.store_email || '',
+          store_phone: data.store_phone || '',
+          store_address: data.store_address || '',
+          business_hours,
+          payment_methods,
         });
       }
     } catch (error) {
@@ -54,10 +88,19 @@ export function StoreSettingsProvider({ children }: { children: ReactNode }) {
       // Optimistic update
       setSettings(prev => ({ ...prev, ...newSettings }));
 
+      // Prepare data for server (serialize objects)
+      const serverData: any = { ...newSettings };
+      if (serverData.business_hours) {
+        serverData.business_hours = JSON.stringify(serverData.business_hours);
+      }
+      if (serverData.payment_methods) {
+        serverData.payment_methods = JSON.stringify(serverData.payment_methods);
+      }
+
       const response = await fetch(`${BASE_URL}/settings`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newSettings),
+        body: JSON.stringify(serverData),
       });
 
       if (!response.ok) {

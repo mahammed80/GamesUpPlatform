@@ -1,7 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { motion } from 'motion/react';
-import { CreditCard, MapPin, User, Mail, Phone, Lock, CheckCircle, Truck, Package, Printer } from 'lucide-react';
+import { CreditCard, MapPin, User, Mail, Phone, Lock, CheckCircle, Truck, Package, Printer, Download } from 'lucide-react';
+import html2canvas from 'html2canvas';
+import jsPDF from 'jspdf';
 import { publicAnonKey } from '../../utils/supabase/info';
 import { BASE_URL } from '../../utils/api';
 import { useStoreSettings } from '../../context/StoreSettingsContext';
@@ -22,7 +24,9 @@ interface DeliveryOption {
 export function Checkout({ onBack, onSuccess }: CheckoutProps) {
   const { formatPrice } = useStoreSettings();
   const [searchParams] = useSearchParams();
+  const receiptRef = useRef<HTMLDivElement>(null);
   const [step, setStep] = useState<'info' | 'delivery' | 'payment' | 'success'>('info');
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [cartItems, setCartItems] = useState<any[]>([]);
   const [purchasedItems, setPurchasedItems] = useState<any[]>([]);
   const [deliveryOptions, setDeliveryOptions] = useState<DeliveryOption[]>([]);
@@ -130,6 +134,41 @@ export function Checkout({ onBack, onSuccess }: CheckoutProps) {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       setPaymentProofFile(e.target.files[0]);
+    }
+  };
+
+  const handleDownloadPDF = async () => {
+    setIsGeneratingPdf(true);
+    // Short delay to allow render
+    await new Promise(resolve => setTimeout(resolve, 100));
+
+    const element = receiptRef.current;
+    if (!element) {
+        setIsGeneratingPdf(false);
+        return;
+    }
+
+    try {
+      // Temporarily make it visible for capture if needed, but the current class 'fixed left-[-9999px]' should work
+      const canvas = await html2canvas(element, {
+        scale: 2,
+        logging: false,
+        useCORS: true,
+        windowWidth: 794 // A4 width in px at 96 DPI approx (210mm)
+      });
+      
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+      
+      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+      pdf.save(`receipt-${formData.fullName.replace(/\s+/g, '-')}-${new Date().toISOString().split('T')[0]}.pdf`);
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      alert('Failed to generate PDF receipt.');
+    } finally {
+        setIsGeneratingPdf(false);
     }
   };
 
@@ -382,11 +421,11 @@ export function Checkout({ onBack, onSuccess }: CheckoutProps) {
             </div>
             <div className="flex gap-4 justify-center">
               <button
-                onClick={() => window.print()}
+                onClick={handleDownloadPDF}
                 className="px-8 py-4 bg-gray-100 text-gray-900 rounded-xl font-semibold hover:bg-gray-200 transition-all flex items-center gap-2"
               >
-                <Printer className="w-5 h-5" />
-                Print Receipt
+                <Download className="w-5 h-5" />
+                Download Receipt
               </button>
               <button
                 onClick={onSuccess}
@@ -868,8 +907,11 @@ export function Checkout({ onBack, onSuccess }: CheckoutProps) {
           </div>
         </div>
       </div>
-      {/* Hidden Print Receipt */}
-      <div className="hidden print:block print:fixed print:inset-0 print:bg-white print:z-[100] p-8">
+      {/* Hidden Print Receipt - Only rendered when generating PDF */}
+      <div 
+        ref={receiptRef} 
+        className={`${isGeneratingPdf ? 'fixed left-[-9999px] top-0 z-[-1]' : 'hidden'} w-[210mm] min-h-[297mm] bg-white p-8`}
+      >
         <div className="text-center mb-8">
           <h1 className="text-2xl font-bold mb-2">GamesUp Store</h1>
           <p className="text-gray-600">Order Receipt</p>

@@ -224,12 +224,18 @@ export function POSNew() {
       if (response.ok) {
         const data = await response.json();
         
+        // Map server response items to match UI expectation
+        const processedItems = (data.purchasedItems || []).map((item: any) => ({
+          ...item,
+          digitalItem: item.digital_key // Map digital_key from server to digitalItem for UI
+        }));
+
         // Prepare invoice data
         const invoice = {
            invoiceNumber: data.orderNumber || `INV-${Date.now()}`,
            date: new Date().toISOString(),
            customer: customerInfo,
-           items: data.purchasedItems || [...cart], // Use server returned items which contain digital keys
+           items: processedItems.length > 0 ? processedItems : [...cart], // Use server returned items which contain digital keys
            subtotal,
            tax,
            total

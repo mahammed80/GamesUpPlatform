@@ -1,6 +1,7 @@
-import { Search, Bell, Moon, Sun, ChevronDown, LogOut, Settings, User, Globe } from 'lucide-react';
+import { Search, Bell, Moon, Sun, ChevronDown, LogOut, Settings, User, Globe, Check, Trash2 } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { api } from '../utils/api';
 
 interface TopBarProps {
   isDarkMode: boolean;
@@ -10,10 +11,55 @@ interface TopBarProps {
   onViewWebsite?: () => void;
 }
 
+interface Notification {
+  id: number;
+  title: string;
+  message: string;
+  type: string;
+  is_read: boolean;
+  created_at: string;
+}
+
 export function TopBar({ isDarkMode, onToggleTheme, user, onLogout, onViewWebsite }: TopBarProps) {
   const navigate = useNavigate();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const notificationsRef = useRef<HTMLDivElement>(null);
+
+  const fetchNotifications = async () => {
+    try {
+      const data = await api.get('/notifications');
+      setNotifications(data);
+    } catch (error) {
+      console.error('Failed to fetch notifications:', error);
+    }
+  };
+
+  const markAsRead = async (id: number) => {
+    try {
+      await api.post(`/notifications/${id}/read`, {});
+      setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: true } : n));
+    } catch (error) {
+      console.error('Failed to mark notification as read:', error);
+    }
+  };
+
+  const markAllAsRead = async () => {
+    try {
+      await api.post('/notifications/read-all', {});
+      setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
+    } catch (error) {
+      console.error('Failed to mark all notifications as read:', error);
+    }
+  };
+
+  useEffect(() => {
+    fetchNotifications();
+    const interval = setInterval(fetchNotifications, 30000); // Poll every 30 seconds
+    return () => clearInterval(interval);
+  }, []);
 
   const getInitials = (name: string) => {
     return name
@@ -27,12 +73,16 @@ export function TopBar({ isDarkMode, onToggleTheme, user, onLogout, onViewWebsit
   const userName = user?.user_metadata?.name || user?.email || 'User';
   const userRole = user?.user_metadata?.role || 'admin';
   const initials = getInitials(userName);
+  const unreadCount = notifications.filter(n => !n.is_read).length;
 
   // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setIsDropdownOpen(false);
+      }
+      if (notificationsRef.current && !notificationsRef.current.contains(event.target as Node)) {
+        setIsNotificationsOpen(false);
       }
     };
 
@@ -64,10 +114,66 @@ export function TopBar({ isDarkMode, onToggleTheme, user, onLogout, onViewWebsit
       {/* Right section */}
       <div className="flex items-center gap-4">
         {/* Notifications */}
-        <button className="relative p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400">
-          <Bell className="w-5 h-5" />
-          <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
-        </button>
+        <div className="relative" ref={notificationsRef}>
+          <button 
+            onClick={() => setIsNotificationsOpen(!isNotificationsOpen)}
+            className="relative p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400"
+          >
+            <Bell className="w-5 h-5" />
+            {unreadCount > 0 && (
+              <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
+            )}
+          </button>
+
+          {/* Notifications Dropdown */}
+          {isNotificationsOpen && (
+            <div className="absolute right-0 mt-2 w-80 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl z-50 overflow-hidden">
+              <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center bg-gray-50 dark:bg-gray-700/50">
+                <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Notifications</h3>
+                {unreadCount > 0 && (
+                  <button 
+                    onClick={markAllAsRead}
+                    className="text-xs text-red-600 dark:text-red-400 hover:text-red-700 font-medium"
+                  >
+                    Mark all read
+                  </button>
+                )}
+              </div>
+              <div className="max-h-96 overflow-y-auto">
+                {notifications.length === 0 ? (
+                  <div className="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">
+                    No notifications yet
+                  </div>
+                ) : (
+                  notifications.map((notification) => (
+                    <div 
+                      key={notification.id}
+                      className={`px-4 py-3 border-b border-gray-100 dark:border-gray-700/50 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors ${!notification.is_read ? 'bg-red-50/50 dark:bg-red-900/10' : ''}`}
+                      onClick={() => !notification.is_read && markAsRead(notification.id)}
+                    >
+                      <div className="flex justify-between items-start gap-2">
+                        <div className="flex-1">
+                          <p className={`text-sm ${!notification.is_read ? 'font-semibold text-gray-900 dark:text-white' : 'text-gray-700 dark:text-gray-300'}`}>
+                            {notification.title}
+                          </p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                            {notification.message}
+                          </p>
+                          <p className="text-[10px] text-gray-400 mt-2">
+                            {new Date(notification.created_at).toLocaleString()}
+                          </p>
+                        </div>
+                        {!notification.is_read && (
+                          <div className="w-2 h-2 bg-red-500 rounded-full mt-1.5 flex-shrink-0"></div>
+                        )}
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          )}
+        </div>
 
         {/* Theme toggle */}
         <button

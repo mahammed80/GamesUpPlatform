@@ -102,26 +102,28 @@ export const productsAPI = {
     if (search) params.append('search', search);
     return fetchAPI(`/public/products?${params.toString()}`);
   },
-  create: (product: any) => fetchAPI('/products', {
+  create: (data: FormData) => fetchAPI('/products', {
     method: 'POST',
-    body: JSON.stringify(product),
+    body: JSON.stringify(Object.fromEntries(data)), // Convert FormData to JSON for now as backend expects JSON
+    headers: { 'Content-Type': 'application/json' }
   }),
-  update: (id: string | number, product: any) => fetchAPI(`/products/${id}`, {
+  update: (id: string | number, data: FormData) => fetchAPI(`/products/${id}`, {
     method: 'PUT',
-    body: JSON.stringify(product),
+    body: JSON.stringify(Object.fromEntries(data)),
+    headers: { 'Content-Type': 'application/json' }
   }),
-  delete: (id: string | number) => fetchAPI(`/products/${id}`, {
-    method: 'DELETE',
-  }),
+  delete: (id: string | number) => fetchAPI(`/products/${id}`, { method: 'DELETE' }),
+  getOverview: (productId: string | number) => fetchAPI(`/admin/product-overview?productId=${productId}`),
 };
 
 // Orders API
 export const ordersAPI = {
-  getAll: (params?: { status?: string; search?: string; email?: string }) => {
+  getAll: (params?: { status?: string; search?: string; email?: string; product?: string }) => {
     const queryParams = new URLSearchParams();
     if (params?.status) queryParams.append('status', params.status);
     if (params?.search) queryParams.append('search', params.search);
     if (params?.email) queryParams.append('email', params.email);
+    if (params?.product) queryParams.append('product', params.product);
     return fetchAPI(`/orders?${queryParams.toString()}`);
   },
   update: (id: string | number, order: any) => fetchAPI(`/orders/${id}`, {

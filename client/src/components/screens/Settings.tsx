@@ -13,25 +13,47 @@ export function Settings() {
     currency_code: 'USD',
     currency_symbol: '$',
     tax_rate: 8.5,
+    store_name: '',
+    store_email: '',
+    store_phone: '',
+    store_address: '',
+    business_hours: [] as { day: string; open: string; close: string }[],
+    payment_methods: [] as { name: string; enabled: boolean }[],
   });
 
   useEffect(() => {
     if (settings) {
+      const defaultPaymentMethods = [
+        { name: 'Credit/Debit Cards', enabled: true },
+        { name: 'PayPal', enabled: true },
+        { name: 'Apple Pay', enabled: true },
+        { name: 'Google Pay', enabled: false },
+        { name: 'Cryptocurrency', enabled: false },
+      ];
+
+      const defaultBusinessHours = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map(day => ({
+        day,
+        open: '09:00',
+        close: '18:00'
+      }));
+
       setFormData({
         currency_code: settings.currency_code,
         currency_symbol: settings.currency_symbol,
         tax_rate: settings.tax_rate,
+        store_name: settings.store_name || '',
+        store_email: settings.store_email || '',
+        store_phone: settings.store_phone || '',
+        store_address: settings.store_address || '',
+        business_hours: (settings.business_hours && settings.business_hours.length > 0) ? settings.business_hours : defaultBusinessHours,
+        payment_methods: (settings.payment_methods && settings.payment_methods.length > 0) ? settings.payment_methods : defaultPaymentMethods,
       });
     }
   }, [settings]);
 
   const handleSave = async () => {
     try {
-      await updateSettings({
-        currency_code: formData.currency_code,
-        currency_symbol: formData.currency_symbol,
-        tax_rate: formData.tax_rate,
-      });
+      await updateSettings(formData);
       alert('Settings saved successfully!');
     } catch (error) {
       alert('Failed to save settings');
@@ -51,6 +73,25 @@ export function Settings() {
     }
     setFormData({ ...formData, currency_code: code, currency_symbol: symbol });
   };
+
+  const handlePaymentToggle = (name: string) => {
+    setFormData(prev => ({
+      ...prev,
+      payment_methods: prev.payment_methods.map(method => 
+        method.name === name ? { ...method, enabled: !method.enabled } : method
+      )
+    }));
+  };
+
+  const handleBusinessHoursChange = (day: string, field: 'open' | 'close', value: string) => {
+    setFormData(prev => ({
+      ...prev,
+      business_hours: prev.business_hours.map(bh => 
+        bh.day === day ? { ...bh, [field]: value } : bh
+      )
+    }));
+  };
+
 
   const tabs = [
     { id: 'store', label: 'Store Info' },
@@ -98,7 +139,9 @@ export function Settings() {
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Store Name</label>
                 <input
                   type="text"
-                  defaultValue="PlayStation Store Admin"
+                  value={formData.store_name}
+                  onChange={(e) => setFormData({ ...formData, store_name: e.target.value })}
+                  placeholder="PlayStation Store Admin"
                   className="w-full px-4 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
@@ -106,7 +149,9 @@ export function Settings() {
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Store Email</label>
                 <input
                   type="email"
-                  defaultValue="store@playstation.com"
+                  value={formData.store_email}
+                  onChange={(e) => setFormData({ ...formData, store_email: e.target.value })}
+                  placeholder="store@playstation.com"
                   className="w-full px-4 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
@@ -114,14 +159,18 @@ export function Settings() {
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Store Phone</label>
                 <input
                   type="tel"
-                  defaultValue="+1 (555) 123-4567"
+                  value={formData.store_phone}
+                  onChange={(e) => setFormData({ ...formData, store_phone: e.target.value })}
+                  placeholder="+1 (555) 123-4567"
                   className="w-full px-4 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Store Address</label>
                 <textarea
-                  defaultValue="2207 Bridgepointe Parkway, San Mateo, CA 94404"
+                  value={formData.store_address}
+                  onChange={(e) => setFormData({ ...formData, store_address: e.target.value })}
+                  placeholder="2207 Bridgepointe Parkway, San Mateo, CA 94404"
                   className="w-full px-4 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
                   rows={3}
                 ></textarea>
@@ -132,18 +181,20 @@ export function Settings() {
           <Card className="p-8">
             <h3 className="font-semibold text-gray-900 dark:text-white mb-4">Business Hours</h3>
             <div className="space-y-3">
-              {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map((day) => (
-                <div key={day} className="flex items-center gap-4">
-                  <div className="w-24 text-sm text-gray-700 dark:text-gray-300">{day}</div>
+              {formData.business_hours.map((day) => (
+                <div key={day.day} className="flex items-center gap-4">
+                  <div className="w-24 text-sm text-gray-700 dark:text-gray-300">{day.day}</div>
                   <input
                     type="time"
-                    defaultValue="09:00"
+                    value={day.open}
+                    onChange={(e) => handleBusinessHoursChange(day.day, 'open', e.target.value)}
                     className="px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                   <span className="text-gray-500 dark:text-gray-400">to</span>
                   <input
                     type="time"
-                    defaultValue="18:00"
+                    value={day.close}
+                    onChange={(e) => handleBusinessHoursChange(day.day, 'close', e.target.value)}
                     className="px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
@@ -159,17 +210,16 @@ export function Settings() {
           <Card className="p-8">
             <h3 className="font-semibold text-gray-900 dark:text-white mb-4">Payment Methods</h3>
             <div className="space-y-3">
-              {[
-                { name: 'Credit/Debit Cards', enabled: true },
-                { name: 'PayPal', enabled: true },
-                { name: 'Apple Pay', enabled: true },
-                { name: 'Google Pay', enabled: false },
-                { name: 'Cryptocurrency', enabled: false },
-              ].map((method) => (
+              {formData.payment_methods.map((method) => (
                 <div key={method.name} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
                   <span className="text-sm text-gray-900 dark:text-white">{method.name}</span>
                   <label className="relative inline-flex items-center cursor-pointer">
-                    <input type="checkbox" defaultChecked={method.enabled} className="sr-only peer" />
+                    <input 
+                      type="checkbox" 
+                      checked={method.enabled} 
+                      onChange={() => handlePaymentToggle(method.name)}
+                      className="sr-only peer" 
+                    />
                     <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-red-300 dark:peer-focus:ring-red-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-red-600"></div>
                   </label>
                 </div>
