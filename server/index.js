@@ -147,7 +147,8 @@ const pool = mysql.createPool({
   port: process.env.DB_PORT || 3306,
   waitForConnections: true,
   connectionLimit: 10,
-  queueLimit: 0
+  queueLimit: 0,
+  multipleStatements: true
 });
 
 // Test database connection
@@ -312,6 +313,34 @@ app.get('/db-check', async (req, res) => {
       message: error.message, 
       code: error.code,
       hint: error.code === 'ER_ACCESS_DENIED_ERROR' ? 'Check DB credentials' : 'Check DB Host/Network'
+    });
+  }
+});
+
+// Emergency Schema Fix Route
+app.get('/fix-db-schema', async (req, res) => {
+  try {
+    const schemaPath = path.join(__dirname, 'schema.sql');
+    if (!fs.existsSync(schemaPath)) {
+      return res.status(404).json({ error: 'Schema file not found' });
+    }
+    
+    const schema = fs.readFileSync(schemaPath, 'utf8');
+    
+    // We can use the existing pool which now has multipleStatements: true
+    const [result] = await pool.query(schema);
+    
+    res.json({ 
+      status: 'success', 
+      message: 'Database schema executed successfully. Missing tables should be created.',
+      result: result
+    });
+  } catch (error) {
+    console.error('Schema update failed:', error);
+    res.status(500).json({ 
+      status: 'error', 
+      message: error.message,
+      code: error.code 
     });
   }
 });
