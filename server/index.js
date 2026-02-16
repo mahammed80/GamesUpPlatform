@@ -277,6 +277,8 @@ app.get(`${BASE_PATH}/health`, async (req, res) => {
       timestamp: new Date().toISOString(),
       database: 'disconnected',
       error: error.message,
+      errorCode: error.code,
+      errorNo: error.errno,
       environment: {
         NODE_ENV: process.env.NODE_ENV,
         PORT: process.env.PORT,
@@ -284,6 +286,32 @@ app.get(`${BASE_PATH}/health`, async (req, res) => {
         DB_USER: process.env.DB_USER,
         DB_NAME: process.env.DB_NAME
       }
+    });
+  }
+});
+
+// Simple Database Check Route (Easier to access)
+app.get('/db-check', async (req, res) => {
+  try {
+    const connection = await pool.getConnection();
+    const [rows] = await connection.query('SELECT NOW() as now, VERSION() as version');
+    connection.release();
+    res.json({ 
+      status: 'connected', 
+      time: rows[0].now, 
+      version: rows[0].version,
+      config: {
+        host: process.env.DB_HOST,
+        user: process.env.DB_USER,
+        db: process.env.DB_NAME
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ 
+      status: 'error', 
+      message: error.message, 
+      code: error.code,
+      hint: error.code === 'ER_ACCESS_DENIED_ERROR' ? 'Check DB credentials' : 'Check DB Host/Network'
     });
   }
 });
