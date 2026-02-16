@@ -163,6 +163,7 @@ const pool = mysql.createPool({
     connection.release();
   } catch (err) {
     console.error('❌ Error connecting to database:', err.message);
+    console.error('Error Code:', err.code);
     if (process.env.DB_HOST !== 'localhost') {
       console.log('💡 Note: Production database connection may only work on Hostinger servers');
     }
