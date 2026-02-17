@@ -8,6 +8,19 @@ const path = require('path');
 const fs = require('fs');
 const multer = require('multer');
 
+// Logging Utility
+const logFile = path.join(__dirname, 'server_error.log');
+const logError = (context, error) => {
+    const timestamp = new Date().toISOString();
+    const message = `[${timestamp}] [${context}] ${error.message}\nStack: ${error.stack}\n\n`;
+    console.error(`[${context}]`, error);
+    try {
+        fs.appendFileSync(logFile, message);
+    } catch (e) {
+        console.error('Failed to write to log file:', e);
+    }
+};
+
 // Load environment variables
 // Priority: 1. server/.env (local/production specific), 2. root .env (shared/dev)
 const serverEnvPath = path.resolve(__dirname, '.env');
@@ -1560,6 +1573,7 @@ app.get(`${BASE_PATH}/debug/deep-diagnose`, async (req, res) => {
 app.get(`${BASE_PATH}/debug/server-logs`, async (req, res) => {
     try {
         const logFiles = [
+            'server_error.log', // Newly added log file
             'stderr.log', 
             'stdout.log', 
             'error_log', 
@@ -1654,6 +1668,8 @@ app.post(`${BASE_PATH}/system/categories`, async (req, res) => {
         });
     }
 
+    logError('Create Category', error);
+
     res.status(500).json({ 
       error: 'Failed to create category',
       details: error.message,
@@ -1688,6 +1704,8 @@ app.put(`${BASE_PATH}/system/categories/:id`, async (req, res) => {
             details: 'The icon image is too large for the database. Please run the schema fix at /fix-db-schema.'
         });
     }
+
+    logError('Update Category', error);
 
     res.status(500).json({ 
       error: 'Failed to update category',
