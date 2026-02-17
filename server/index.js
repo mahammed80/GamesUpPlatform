@@ -2665,9 +2665,26 @@ async function runMigrations() {
         password_hash VARCHAR(255) NOT NULL,
         name VARCHAR(255),
         role VARCHAR(50) DEFAULT 'user',
+        job_title VARCHAR(100),
+        phone VARCHAR(50),
+        avatar VARCHAR(255),
+        identity_document VARCHAR(255),
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
+
+    // 6.1 Fix Users Schema (Add missing columns)
+    try {
+        const [userColumns] = await connection.query('SHOW COLUMNS FROM users');
+        const userFields = userColumns.map(c => c.Field);
+        
+        if (!userFields.includes('job_title')) await connection.query('ALTER TABLE users ADD COLUMN job_title VARCHAR(100)');
+        if (!userFields.includes('phone')) await connection.query('ALTER TABLE users ADD COLUMN phone VARCHAR(50)');
+        if (!userFields.includes('avatar')) await connection.query('ALTER TABLE users ADD COLUMN avatar VARCHAR(255)');
+        if (!userFields.includes('identity_document')) await connection.query('ALTER TABLE users ADD COLUMN identity_document VARCHAR(255)');
+    } catch (e) {
+        console.error('Error fixing users schema:', e);
+    }
 
     // 7. Orders Table
     await connection.query(`
@@ -2704,6 +2721,17 @@ async function runMigrations() {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
+
+    // 8.1 Fix Employees Schema
+    try {
+        const [empColumns] = await connection.query('SHOW COLUMNS FROM employees');
+        const empFields = empColumns.map(c => c.Field);
+        
+        if (!empFields.includes('image')) await connection.query('ALTER TABLE employees ADD COLUMN image VARCHAR(255)');
+        if (!empFields.includes('department')) await connection.query('ALTER TABLE employees ADD COLUMN department VARCHAR(100)');
+    } catch (e) {
+        console.error('Error fixing employees schema:', e);
+    }
 
     // 9. Attendance Table
     await connection.query(`
