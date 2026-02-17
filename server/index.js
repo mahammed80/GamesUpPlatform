@@ -132,6 +132,16 @@ app.use('/uploads', express.static(uploadDir, {
   setHeaders: (res, filePath) => {
     if (filePath.endsWith('.js')) {
       res.setHeader('Content-Type', 'application/javascript');
+    } else if (filePath.match(/\.(jpg|jpeg|png|gif|svg)$/i)) {
+      const ext = path.extname(filePath).toLowerCase();
+      const mimeTypes = {
+        '.jpg': 'image/jpeg',
+        '.jpeg': 'image/jpeg',
+        '.png': 'image/png',
+        '.gif': 'image/gif',
+        '.svg': 'image/svg+xml'
+      };
+      res.setHeader('Content-Type', mimeTypes[ext] || 'application/octet-stream');
     }
   }
 }));
@@ -2757,6 +2767,35 @@ async function runMigrations() {
         is_active BOOLEAN DEFAULT TRUE,
         start_date DATE,
         end_date DATE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // 11. Sub Categories Table
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS sub_categories (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        category_id INT NOT NULL,
+        name VARCHAR(255) NOT NULL,
+        description TEXT,
+        slug VARCHAR(255) NOT NULL,
+        display_order INT DEFAULT 0,
+        is_active BOOLEAN DEFAULT TRUE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE CASCADE
+      )
+    `);
+
+    // 12. Product Attributes Table
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS product_attributes (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
+        type VARCHAR(50) NOT NULL,
+        options JSON,
+        is_required BOOLEAN DEFAULT FALSE,
+        display_order INT DEFAULT 0,
+        is_active BOOLEAN DEFAULT TRUE,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
