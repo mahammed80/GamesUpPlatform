@@ -63,11 +63,20 @@ CREATE TABLE IF NOT EXISTS orders (
   digital_password VARCHAR(255),
   digital_code VARCHAR(255),
   inventory_id VARCHAR(50),
+  payment_method VARCHAR(50),
+  payment_proof VARCHAR(255),
+  shipping_address JSON,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE IF NOT EXISTS employees (
-  id INT AUTO_INCREMENT PRIMARY KEY,
+-- Ensure orders table has new columns (Migration Fix)
+-- We use simple ALTER statements because the runner ignores "Duplicate column" errors (1060)
+ALTER TABLE orders ADD COLUMN payment_method VARCHAR(50);
+ALTER TABLE orders ADD COLUMN payment_proof VARCHAR(255);
+ALTER TABLE orders ADD COLUMN shipping_address JSON;
+ 
+ CREATE TABLE IF NOT EXISTS employees (
+   id INT AUTO_INCREMENT PRIMARY KEY,
   name VARCHAR(255) NOT NULL,
   role VARCHAR(100),
   department VARCHAR(100),

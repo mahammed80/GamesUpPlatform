@@ -361,20 +361,27 @@ app.get('/fix-db-schema', async (req, res) => {
 
     const results = [];
     const errors = [];
+    
+    // Get a dedicated connection for the schema update to ensure session variables work if used
+    const connection = await pool.getConnection();
 
-    // Execute statements sequentially
-    for (const statement of statements) {
-      try {
-        await pool.query(statement);
-        results.push({ statement: statement.substring(0, 50) + '...', status: 'success' });
-      } catch (err) {
-        // Ignore "Table already exists" (1050) or "Column already exists" (1060) or "Duplicate key" (1061/1062)
-        if ([1050, 1060, 1061, 1062].includes(err.errno)) {
-           results.push({ statement: statement.substring(0, 50) + '...', status: 'skipped', reason: err.message });
-        } else {
-           errors.push({ statement: statement.substring(0, 50) + '...', error: err.message });
+    try {
+        // Execute statements sequentially
+        for (const statement of statements) {
+          try {
+            await connection.query(statement);
+            results.push({ statement: statement.substring(0, 50) + '...', status: 'success' });
+          } catch (err) {
+            // Ignore "Table already exists" (1050) or "Column already exists" (1060) or "Duplicate key" (1061/1062)
+            if ([1050, 1060, 1061, 1062].includes(err.errno)) {
+               results.push({ statement: statement.substring(0, 50) + '...', status: 'skipped', reason: err.message });
+            } else {
+               errors.push({ statement: statement.substring(0, 50) + '...', error: err.message });
+            }
+          }
         }
-      }
+    } finally {
+        connection.release();
     }
     
     res.json({ 
@@ -787,8 +794,8 @@ app.post(`${BASE_PATH}/customer-orders`, async (req, res) => {
             order_number, customer_name, customer_email, product_name, 
             date, status, amount, 
             digital_email, digital_password, digital_code, inventory_id,
-            payment_method, payment_proof
-          ) VALUES (?, ?, ?, ?, NOW(), ?, ?, ?, ?, ?, ?, ?, ?)`,
+            payment_method, payment_proof, shipping_address
+          ) VALUES (?, ?, ?, ?, NOW(), ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [
             orderNumber, 
             customerName, 
@@ -801,7 +808,8 @@ app.post(`${BASE_PATH}/customer-orders`, async (req, res) => {
             assignNow && assignedKey ? assignedKey.code : null,
             isPOS ? 'POS' : null,
             paymentMethod || null,
-            paymentProof || null
+            paymentProof || null,
+            JSON.stringify(shippingAddress || {})
           ]
         );
 
@@ -852,7 +860,7 @@ app.post(`${BASE_PATH}/customer-orders`, async (req, res) => {
                   <p>Hello ${customerName},</p>
                   <p>Thank you for your purchase at our store!</p>
                   <p><strong>Order Number:</strong> ${orderNumber}</p>
-                  <p><strong>Total:</strong> $${total.toFixed(2)}</p>
+                  <p><strong>Total:</strong> $${Number(total).toFixed(2)}</p>
                   
                   <h3 style="margin-top: 20px;">Your Digital Items:</h3>
                   ${keysHtml}
@@ -879,7 +887,7 @@ app.post(`${BASE_PATH}/customer-orders`, async (req, res) => {
                   <p>Hello ${customerName},</p>
                   <p>Thank you for your order! We have received your request.</p>
                   <p><strong>Order Number:</strong> ${orderNumber}</p>
-                  <p><strong>Total:</strong> $${total.toFixed(2)}</p>
+                  <p><strong>Total:</strong> $${Number(total).toFixed(2)}</p>
                   <p><strong>Payment Method:</strong> ${paymentMethod || 'POS'}</p>
                   <p><strong>Status:</strong> ${isCard ? 'Pending Payment' : 'Pending Verification'}</p>
                   
@@ -902,7 +910,7 @@ app.post(`${BASE_PATH}/customer-orders`, async (req, res) => {
   } catch (error) {
     await connection.rollback();
     console.error('Error creating POS order:', error);
-    res.status(500).json({ error: 'Failed to create order' });
+    res.status(500).json({ error: 'Failed to create order', details: error.message });
   } finally {
     connection.release();
   }

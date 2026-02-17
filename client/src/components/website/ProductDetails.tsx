@@ -185,6 +185,10 @@ export function ProductDetails({ onOpenCart, productId }: ProductDetailsProps) {
                  <img 
                   src={product.image} 
                   alt={product.name}
+                  onError={(e) => {
+                    e.currentTarget.src = 'https://placehold.co/600x600?text=No+Image';
+                    e.currentTarget.onerror = null;
+                  }}
                   className="w-full h-full object-cover drop-shadow-2xl hover:scale-105 transition-transform duration-500"
                 />
               </motion.div>

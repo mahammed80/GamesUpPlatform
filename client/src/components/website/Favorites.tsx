@@ -104,6 +104,10 @@ export function Favorites({ onBack, onAddToCart }: FavoritesProps) {
                   <img
                     src={item.image}
                     alt={item.name}
+                    onError={(e) => {
+                      e.currentTarget.src = 'https://placehold.co/400x300?text=No+Image';
+                      e.currentTarget.onerror = null;
+                    }}
                     className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
                   />
                   <button

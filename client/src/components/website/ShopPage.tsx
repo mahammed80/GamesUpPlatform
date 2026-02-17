@@ -233,6 +233,10 @@ export function ShopPage({ onNavigate, onOpenCart }: ShopPageProps) {
                     <img
                       src={product.image}
                       alt={product.name}
+                      onError={(e) => {
+                        e.currentTarget.src = 'https://placehold.co/400x400?text=No+Image';
+                        e.currentTarget.onerror = null;
+                      }}
                       className="w-full h-full object-cover"
                     />
                   ) : (

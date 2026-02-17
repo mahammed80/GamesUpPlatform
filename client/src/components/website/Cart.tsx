@@ -129,6 +129,10 @@ export function Cart({ isOpen, onClose, onCheckout, onNavigate }: CartProps) {
                         <img
                           src={item.image}
                           alt={item.name}
+                          onError={(e) => {
+                            e.currentTarget.src = 'https://placehold.co/100x100?text=No+Image';
+                            e.currentTarget.onerror = null;
+                          }}
                           className="w-full h-full object-cover"
                         />
                       </div>
