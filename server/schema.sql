@@ -8,10 +8,13 @@ CREATE TABLE IF NOT EXISTS products (
   id INT AUTO_INCREMENT PRIMARY KEY,
   name VARCHAR(255) NOT NULL,
   category_slug VARCHAR(100),
+  sub_category_slug VARCHAR(255),
   price DECIMAL(10, 2),
+  cost DECIMAL(10, 2),
   stock INT DEFAULT 0,
   image VARCHAR(255),
   description TEXT,
+  attributes JSON,
   digital_items JSON,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -104,6 +107,12 @@ CREATE TABLE IF NOT EXISTS categories (
   is_active BOOLEAN DEFAULT TRUE,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+-- Ensure products table has all required columns (for existing installs)
+ALTER TABLE products ADD COLUMN sub_category_slug VARCHAR(255);
+ALTER TABLE products ADD COLUMN cost DECIMAL(10, 2);
+ALTER TABLE products ADD COLUMN attributes JSON;
+ALTER TABLE products MODIFY digital_items JSON;
 
 -- Ensure icon is TEXT for existing tables
 ALTER TABLE categories MODIFY icon TEXT;

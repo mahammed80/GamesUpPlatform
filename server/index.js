@@ -328,13 +328,35 @@ app.get('/fix-db-schema', async (req, res) => {
     
     const schema = fs.readFileSync(schemaPath, 'utf8');
     
-    // We can use the existing pool which now has multipleStatements: true
-    const [result] = await pool.query(schema);
+    // Split by semicolon and remove empty statements
+    const statements = schema
+      .split(';')
+      .map(s => s.trim())
+      .filter(s => s.length > 0);
+
+    const results = [];
+    const errors = [];
+
+    // Execute statements sequentially
+    for (const statement of statements) {
+      try {
+        await pool.query(statement);
+        results.push({ statement: statement.substring(0, 50) + '...', status: 'success' });
+      } catch (err) {
+        // Ignore "Table already exists" (1050) or "Column already exists" (1060) or "Duplicate key" (1061/1062)
+        if ([1050, 1060, 1061, 1062].includes(err.errno)) {
+           results.push({ statement: statement.substring(0, 50) + '...', status: 'skipped', reason: err.message });
+        } else {
+           errors.push({ statement: statement.substring(0, 50) + '...', error: err.message });
+        }
+      }
+    }
     
     res.json({ 
-      status: 'success', 
-      message: 'Database schema executed successfully. Missing tables should be created.',
-      result: result
+      status: errors.length > 0 ? 'partial_success' : 'success', 
+      message: 'Database schema execution completed.',
+      results: results,
+      errors: errors
     });
   } catch (error) {
     console.error('Schema update failed:', error);
@@ -2078,55 +2100,8 @@ app.delete(`${BASE_PATH}/admin/users/:id`, async (req, res) => {
   }
 });
 
-// Settings Routes
-app.get(`${BASE_PATH}/settings`, async (req, res) => {
-  try {
-    const [rows] = await pool.query('SELECT * FROM settings');
-    const settings = rows.reduce((acc, row) => {
-      acc[row.setting_key] = row.setting_value;
-      return acc;
-    }, {});
-
-    // Ensure defaults
-    if (!settings.currency_code) settings.currency_code = 'USD';
-    if (!settings.currency_symbol) settings.currency_symbol = '$';
-    if (!settings.tax_rate) settings.tax_rate = '8.5';
-
-    res.json(settings);
-  } catch (error) {
-    console.error('Error fetching settings:', error);
-    res.status(500).json({ error: 'Failed to fetch settings' });
-  }
-});
-
-app.post(`${BASE_PATH}/settings`, async (req, res) => {
-  try {
-    const settings = req.body; // { currency_code: 'EGP', currency_symbol: 'E£', tax_rate: '10' }
-
-    const connection = await pool.getConnection();
-    try {
-      await connection.beginTransaction();
-
-      for (const [key, value] of Object.entries(settings)) {
-        await connection.query(
-          'INSERT INTO settings (setting_key, setting_value) VALUES (?, ?) ON DUPLICATE KEY UPDATE setting_value = ?',
-          [key, String(value), String(value)]
-        );
-      }
-
-      await connection.commit();
-      res.json({ message: 'Settings updated successfully' });
-    } catch (error) {
-      await connection.rollback();
-      throw error;
-    } finally {
-      connection.release();
-    }
-  } catch (error) {
-    console.error('Error updating settings:', error);
-    res.status(500).json({ error: 'Failed to update settings' });
-  }
-});
+// Settings routes are defined earlier in the file (around line 478)
+// Removed duplicate implementation to prevent conflicts
 
 // Create Customer Order
 app.post(`${BASE_PATH}/customer-orders`, async (req, res) => {
