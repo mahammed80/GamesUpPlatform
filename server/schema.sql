@@ -113,7 +113,7 @@ CREATE TABLE IF NOT EXISTS roles (
 CREATE TABLE IF NOT EXISTS categories (
   id INT AUTO_INCREMENT PRIMARY KEY,
   name VARCHAR(255) NOT NULL,
-  slug VARCHAR(255) NOT NULL,
+  slug VARCHAR(255) UNIQUE NOT NULL,
   icon TEXT,
   display_order INT DEFAULT 0,
   is_active BOOLEAN DEFAULT TRUE,
@@ -126,14 +126,42 @@ ALTER TABLE products ADD COLUMN cost DECIMAL(10, 2);
 ALTER TABLE products ADD COLUMN attributes JSON;
 ALTER TABLE products MODIFY digital_items JSON;
 
--- Ensure users table has all required columns (for existing installs)
-ALTER TABLE users ADD COLUMN job_title VARCHAR(100);
-ALTER TABLE users ADD COLUMN phone VARCHAR(50);
-ALTER TABLE users ADD COLUMN avatar VARCHAR(255);
-ALTER TABLE users ADD COLUMN identity_document VARCHAR(255);
+-- Ensure icon is TEXT for existing tables (Migration Fix)
+SET @dbname = DATABASE();
+SET @tablename = "categories";
+SET @columnname = "icon";
+SET @preparedStatement = (SELECT IF(
+  (
+    SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE
+      (table_name = @tablename)
+      AND (table_schema = @dbname)
+      AND (column_name = @columnname)
+  ) > 0,
+  "SELECT 1",
+  "ALTER TABLE categories ADD COLUMN icon TEXT"
+));
+PREPARE alterIfNotExists FROM @preparedStatement;
+EXECUTE alterIfNotExists;
+DEALLOCATE PREPARE alterIfNotExists;
 
--- Ensure icon is TEXT for existing tables
-ALTER TABLE categories MODIFY icon TEXT;
+-- Ensure users table columns exist (Migration Fix)
+SET @tablename_users = "users";
+SET @columnname_phone = "phone";
+SET @preparedStatementUsers = (SELECT IF(
+  (
+    SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE
+      (table_name = @tablename_users)
+      AND (table_schema = @dbname)
+      AND (column_name = @columnname_phone)
+  ) > 0,
+  "SELECT 1",
+  "ALTER TABLE users ADD COLUMN phone VARCHAR(50)"
+));
+PREPARE alterUsers FROM @preparedStatementUsers;
+EXECUTE alterUsers;
+DEALLOCATE PREPARE alterUsers;
 
 CREATE TABLE IF NOT EXISTS sub_categories (
   id INT AUTO_INCREMENT PRIMARY KEY,

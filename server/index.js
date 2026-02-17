@@ -2594,12 +2594,38 @@ async function runMigrations() {
         id INT AUTO_INCREMENT PRIMARY KEY,
         name VARCHAR(255) NOT NULL,
         slug VARCHAR(255) UNIQUE NOT NULL,
-        image_url VARCHAR(255),
+        icon TEXT,
         is_active BOOLEAN DEFAULT TRUE,
         display_order INT DEFAULT 0,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
+
+    // 3.1 Fix Categories Schema (Add 'icon' if missing)
+    try {
+        const [catColumns] = await connection.query('SHOW COLUMNS FROM categories');
+        const hasIcon = catColumns.some(c => c.Field === 'icon');
+        const hasImageUrl = catColumns.some(c => c.Field === 'image_url');
+        
+        if (!hasIcon) {
+            console.log('Adding missing "icon" column to categories table...');
+            await connection.query('ALTER TABLE categories ADD COLUMN icon TEXT');
+            
+            // If image_url exists, copy data to icon
+            if (hasImageUrl) {
+                await connection.query('UPDATE categories SET icon = image_url WHERE icon IS NULL');
+            }
+        } else {
+            // Ensure it is TEXT
+            const iconCol = catColumns.find(c => c.Field === 'icon');
+            if (iconCol && !iconCol.Type.toLowerCase().includes('text')) {
+                 console.log('Modifying "icon" column to TEXT...');
+                 await connection.query('ALTER TABLE categories MODIFY COLUMN icon TEXT');
+            }
+        }
+    } catch (e) {
+        console.error('Error fixing categories schema:', e);
+    }
 
     // 4. Products Table
     await connection.query(`
