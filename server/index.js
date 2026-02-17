@@ -1557,6 +1557,42 @@ app.get(`${BASE_PATH}/debug/deep-diagnose`, async (req, res) => {
   }
 });
 
+app.get(`${BASE_PATH}/debug/server-logs`, async (req, res) => {
+    try {
+        const logFiles = [
+            'stderr.log', 
+            'stdout.log', 
+            'error_log', 
+            'logs/error.log', 
+            'logs/app.log',
+            '../stderr.log',
+            '../error_log'
+        ];
+        
+        const logs = {};
+        for (const file of logFiles) {
+            const filePath = path.join(__dirname, file); // Try relative to server/
+            const rootPath = path.join(__dirname, '..', file); // Try relative to root
+            
+            if (fs.existsSync(filePath)) {
+                logs[file] = fs.readFileSync(filePath, 'utf8').slice(-5000); // Last 5000 chars
+            } else if (fs.existsSync(rootPath)) {
+                logs[file] = fs.readFileSync(rootPath, 'utf8').slice(-5000);
+            } else {
+                logs[file] = 'Not found';
+            }
+        }
+        
+        res.json({
+            message: 'Server Log Dump',
+            timestamp: new Date().toISOString(),
+            logs: logs
+        });
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to read logs', details: error.message });
+    }
+});
+
 // System Categories Routes
 app.get(`${BASE_PATH}/system/categories`, async (req, res) => {
   try {
