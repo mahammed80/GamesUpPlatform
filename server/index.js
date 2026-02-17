@@ -1513,6 +1513,18 @@ app.get(`${BASE_PATH}/debug/deep-diagnose`, async (req, res) => {
         }
     }
 
+    // Check Categories Table Structure
+    if (tableNames.includes('categories')) {
+        const [columns] = await connection.query('SHOW COLUMNS FROM categories');
+        const iconColumn = columns.find(c => c.Field === 'icon');
+        if (iconColumn) {
+            report.tables.categories_icon_type = iconColumn.Type;
+            if (!iconColumn.Type.toLowerCase().includes('text')) {
+                report.dataIssues.push(`Categories icon column is ${iconColumn.Type}, expected TEXT. Run /fix-db-schema.`);
+            }
+        }
+    }
+
     // 3. Check Products & JSON
     if (tableNames.includes('products')) {
         const [products] = await connection.query('SELECT id, name, category_slug, digital_items FROM products LIMIT 50');
@@ -1591,6 +1603,14 @@ app.post(`${BASE_PATH}/system/categories`, async (req, res) => {
     res.json({ message: 'Category created successfully' });
   } catch (error) {
     console.error('Error creating category:', error);
+    
+    if (error.code === 'ER_DUP_ENTRY') {
+      return res.status(409).json({ 
+        error: 'Category already exists',
+        details: 'A category with this slug or name already exists' 
+      });
+    }
+
     res.status(500).json({ 
       error: 'Failed to create category',
       details: error.message,
@@ -1611,7 +1631,18 @@ app.put(`${BASE_PATH}/system/categories/:id`, async (req, res) => {
     res.json({ message: 'Category updated successfully' });
   } catch (error) {
     console.error('Error updating category:', error);
-    res.status(500).json({ error: 'Failed to update category' });
+    
+    if (error.code === 'ER_DUP_ENTRY') {
+      return res.status(409).json({ 
+        error: 'Category already exists',
+        details: 'A category with this slug or name already exists' 
+      });
+    }
+
+    res.status(500).json({ 
+      error: 'Failed to update category',
+      details: error.message
+    });
   }
 });
 
@@ -1667,6 +1698,14 @@ app.post(`${BASE_PATH}/system/subcategories`, async (req, res) => {
     res.json({ message: 'Sub-category created successfully' });
   } catch (error) {
     console.error('Error creating sub-category:', error);
+
+    if (error.code === 'ER_DUP_ENTRY') {
+      return res.status(409).json({ 
+        error: 'Sub-category already exists',
+        details: 'A sub-category with this slug already exists' 
+      });
+    }
+
     res.status(500).json({ 
       error: 'Failed to create sub-category',
       details: error.message,
@@ -1687,7 +1726,18 @@ app.put(`${BASE_PATH}/system/subcategories/:id`, async (req, res) => {
     res.json({ message: 'Sub-category updated successfully' });
   } catch (error) {
     console.error('Error updating sub-category:', error);
-    res.status(500).json({ error: 'Failed to update sub-category' });
+    
+    if (error.code === 'ER_DUP_ENTRY') {
+      return res.status(409).json({ 
+        error: 'Sub-category already exists',
+        details: 'A sub-category with this slug already exists' 
+      });
+    }
+
+    res.status(500).json({ 
+      error: 'Failed to update sub-category',
+      details: error.message 
+    });
   }
 });
 
@@ -1726,12 +1776,15 @@ app.post(`${BASE_PATH}/system/attributes`, async (req, res) => {
     const { name, type, options, isRequired, displayOrder, isActive } = req.body;
     await pool.query(
       'INSERT INTO product_attributes (name, type, options, is_required, display_order, is_active) VALUES (?, ?, ?, ?, ?, ?)',
-      [name, type, JSON.stringify(options), isRequired, displayOrder || 0, isActive]
+      [name, type, JSON.stringify(options), isRequired ? 1 : 0, displayOrder || 0, isActive ? 1 : 0]
     );
     res.json({ message: 'Attribute created successfully' });
   } catch (error) {
     console.error('Error creating attribute:', error);
-    res.status(500).json({ error: 'Failed to create attribute' });
+    res.status(500).json({ 
+      error: 'Failed to create attribute',
+      details: error.message 
+    });
   }
 });
 
@@ -1741,12 +1794,15 @@ app.put(`${BASE_PATH}/system/attributes/:id`, async (req, res) => {
     const { name, type, options, isRequired, displayOrder, isActive } = req.body;
     await pool.query(
       'UPDATE product_attributes SET name=?, type=?, options=?, is_required=?, display_order=?, is_active=? WHERE id=?',
-      [name, type, JSON.stringify(options), isRequired, displayOrder, isActive, id]
+      [name, type, JSON.stringify(options), isRequired ? 1 : 0, displayOrder || 0, isActive ? 1 : 0, id]
     );
     res.json({ message: 'Attribute updated successfully' });
   } catch (error) {
     console.error('Error updating attribute:', error);
-    res.status(500).json({ error: 'Failed to update attribute' });
+    res.status(500).json({ 
+      error: 'Failed to update attribute',
+      details: error.message 
+    });
   }
 });
 
