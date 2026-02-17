@@ -1393,6 +1393,123 @@ Thank you for shopping with us!
   }
 });
 
+// Debug Diagnostic Route
+app.get(`${BASE_PATH}/debug/diagnose`, async (req, res) => {
+  const diagnostics = {
+    env: {
+      NODE_ENV: process.env.NODE_ENV,
+      DB_HOST: process.env.DB_HOST,
+      DB_USER: process.env.DB_USER ? '***' : 'undefined',
+      DB_NAME: process.env.DB_NAME,
+      PORT: process.env.PORT,
+      PWD: process.cwd(),
+      DIRNAME: __dirname
+    },
+    files: {
+      serverEnv: fs.existsSync(path.resolve(__dirname, '.env')),
+      rootEnv: fs.existsSync(path.resolve(__dirname, '../.env')),
+      schemaSql: fs.existsSync(path.join(__dirname, 'schema.sql'))
+    },
+    database: {
+      status: 'unknown',
+      tables: []
+    }
+  };
+
+  try {
+    const connection = await pool.getConnection();
+    diagnostics.database.status = 'connected';
+    
+    // List tables
+    const [rows] = await connection.query('SHOW TABLES');
+    diagnostics.database.tables = rows.map(r => Object.values(r)[0]);
+    
+    // Describe categories if exists
+    if (diagnostics.database.tables.includes('categories')) {
+       const [cols] = await connection.query('DESCRIBE categories');
+       diagnostics.database.categories_schema = cols;
+    }
+
+    connection.release();
+  } catch (err) {
+    diagnostics.database.status = 'error';
+    diagnostics.database.error = err.message;
+    diagnostics.database.code = err.code;
+  }
+
+  res.json(diagnostics);
+});
+
+// Deep Data Diagnostic Route (Temporary)
+app.get(`${BASE_PATH}/debug/deep-diagnose`, async (req, res) => {
+  const report = {
+    status: 'starting',
+    tables: {},
+    dataIssues: []
+  };
+
+  try {
+    const connection = await pool.getConnection();
+    
+    // 1. Check Tables
+    const [tables] = await connection.query('SHOW TABLES');
+    const tableNames = tables.map(t => Object.values(t)[0]);
+    report.tables.list = tableNames;
+    
+    const requiredTables = ['products', 'categories', 'sub_categories', 'settings'];
+    const missingTables = requiredTables.filter(t => !tableNames.includes(t));
+    report.tables.missing = missingTables;
+
+    // 2. Check Settings
+    if (tableNames.includes('settings')) {
+        const [settings] = await connection.query('SELECT * FROM settings');
+        report.tables.settings_count = settings.length;
+        if (settings.length === 0) {
+            report.dataIssues.push('Settings table is empty. App might crash expecting defaults.');
+            // Auto-fix: Insert defaults
+            await connection.query(`
+                INSERT INTO settings (setting_key, setting_value) VALUES 
+                ('currency_code', 'USD'),
+                ('currency_symbol', '$'),
+                ('tax_rate', '0'),
+                ('site_title', 'GamesUp')
+            `);
+            report.dataIssues.push('FIXED: Inserted default settings.');
+        }
+    }
+
+    // 3. Check Products & JSON
+    if (tableNames.includes('products')) {
+        const [products] = await connection.query('SELECT id, name, category_slug, digital_items FROM products LIMIT 50');
+        report.tables.products_count = products.length;
+        
+        products.forEach(p => {
+            if (p.digital_items) {
+                try {
+                    if (typeof p.digital_items === 'string') JSON.parse(p.digital_items);
+                } catch (e) {
+                    report.dataIssues.push(`Product ${p.id} (${p.name}) has invalid digital_items JSON.`);
+                }
+            }
+            if (!p.category_slug) {
+                report.dataIssues.push(`Product ${p.id} (${p.name}) has missing category_slug.`);
+            }
+        });
+    }
+
+    connection.release();
+    res.json(report);
+
+  } catch (err) {
+    console.error('Deep diagnostic failed:', err);
+    res.status(500).json({ 
+        error: 'Diagnostic failed', 
+        details: err.message, 
+        stack: err.stack 
+    });
+  }
+});
+
 // System Categories Routes
 app.get(`${BASE_PATH}/system/categories`, async (req, res) => {
   try {
@@ -1426,9 +1543,15 @@ app.post(`${BASE_PATH}/system/categories`, async (req, res) => {
       });
     }
 
+    // Ensure icon fits in VARCHAR(255) or truncate/handle it
+    let safeIcon = icon;
+    if (safeIcon && safeIcon.length > 255) {
+        console.warn('Icon URL too long, truncating or nulling');
+    }
+
     await pool.query(
       'INSERT INTO categories (name, slug, icon, display_order, is_active) VALUES (?, ?, ?, ?, ?)',
-      [name, slug, icon, displayOrder || 0, isActive]
+      [name, slug, safeIcon, displayOrder || 0, isActive ? 1 : 0]
     );
     res.json({ message: 'Category created successfully' });
   } catch (error) {
@@ -1504,7 +1627,7 @@ app.post(`${BASE_PATH}/system/subcategories`, async (req, res) => {
 
     await pool.query(
       'INSERT INTO sub_categories (category_id, name, description, slug, display_order, is_active) VALUES (?, ?, ?, ?, ?, ?)',
-      [categoryId, name, description, slug, displayOrder || 0, isActive]
+      [categoryId, name, description, slug, displayOrder || 0, isActive ? 1 : 0]
     );
     res.json({ message: 'Sub-category created successfully' });
   } catch (error) {

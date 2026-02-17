@@ -99,11 +99,14 @@ CREATE TABLE IF NOT EXISTS categories (
   id INT AUTO_INCREMENT PRIMARY KEY,
   name VARCHAR(255) NOT NULL,
   slug VARCHAR(255) NOT NULL,
-  icon VARCHAR(255),
+  icon TEXT,
   display_order INT DEFAULT 0,
   is_active BOOLEAN DEFAULT TRUE,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+-- Ensure icon is TEXT for existing tables
+ALTER TABLE categories MODIFY icon TEXT;
 
 CREATE TABLE IF NOT EXISTS sub_categories (
   id INT AUTO_INCREMENT PRIMARY KEY,
