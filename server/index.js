@@ -154,7 +154,9 @@ const storage = multer.diskStorage({
   },
   filename: function (req, file, cb) {
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9)
-    cb(null, uniqueSuffix + '-' + file.originalname)
+    // Sanitize filename: remove special chars, spaces, etc.
+    const sanitizedOriginalName = file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_');
+    cb(null, uniqueSuffix + '-' + sanitizedOriginalName)
   }
 })
 
@@ -391,6 +393,40 @@ app.get('/fix-db-schema', async (req, res) => {
   }
 });
 
+// Fix Storage Link (Hostinger Helper)
+app.get('/fix-storage-link', (req, res) => {
+  try {
+    // Hostinger structure: /domains/domain.com/gamesup-server (cwd) -> /domains/domain.com/public_html
+    const publicHtmlPath = path.join(__dirname, '../public_html');
+    const publicHtmlUploads = path.join(publicHtmlPath, 'uploads');
+    const serverUploads = path.join(__dirname, 'uploads');
+    
+    // Check if public_html exists
+    if (!fs.existsSync(publicHtmlPath)) {
+      return res.status(404).json({ error: 'public_html not found at ../public_html' });
+    }
+    
+    // Check if uploads link already exists
+    if (fs.existsSync(publicHtmlUploads)) {
+      const stats = fs.lstatSync(publicHtmlUploads);
+      if (stats.isSymbolicLink()) {
+        return res.json({ message: 'Symlink already exists', path: publicHtmlUploads });
+      } else {
+        return res.status(400).json({ error: 'public_html/uploads exists and is not a symlink. Please delete it first via File Manager.' });
+      }
+    }
+    
+    // Create symlink
+    // We use absolute paths to be safe
+    fs.symlinkSync(serverUploads, publicHtmlUploads, 'dir');
+    
+    res.json({ success: true, message: 'Symlink created successfully. You can now access uploads via root domain.' });
+  } catch (error) {
+    console.error('Symlink error:', error);
+    res.status(500).json({ error: 'Failed to create symlink', details: error.message });
+  }
+});
+
 // Simple root health check
 app.get('/', (req, res) => {
   res.json({
@@ -417,7 +453,14 @@ app.post(`${BASE_PATH}/upload`, upload.single('image'), (req, res) => {
     if (!req.file) {
       return res.status(400).json({ error: 'No file uploaded' });
     }
-    const fileUrl = `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}`;
+    
+    // Use PUBLIC_URL from env if set (e.g., https://games-up.co/api), otherwise construct from request
+    // This is crucial for when the backend is mounted at a subpath (like /api)
+    const baseUrl = process.env.PUBLIC_URL || `${req.protocol}://${req.get('host')}`;
+    // Ensure no double slashes if baseUrl has trailing slash
+    const finalBaseUrl = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
+    
+    const fileUrl = `${finalBaseUrl}/uploads/${req.file.filename}`;
     res.json({ url: fileUrl });
   } catch (error) {
     console.error('Error uploading file:', error);
