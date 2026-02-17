@@ -1478,7 +1478,7 @@ app.get(`${BASE_PATH}/debug/deep-diagnose`, async (req, res) => {
     const tableNames = tables.map(t => Object.values(t)[0]);
     report.tables.list = tableNames;
     
-    const requiredTables = ['products', 'categories', 'sub_categories', 'settings'];
+    const requiredTables = ['products', 'categories', 'sub_categories', 'settings', 'users', 'roles', 'employees', 'attendance'];
     const missingTables = requiredTables.filter(t => !tableNames.includes(t));
     report.tables.missing = missingTables;
 
@@ -1497,6 +1497,19 @@ app.get(`${BASE_PATH}/debug/deep-diagnose`, async (req, res) => {
                 ('site_title', 'GamesUp')
             `);
             report.dataIssues.push('FIXED: Inserted default settings.');
+        }
+    }
+
+    // Check Users Table Structure
+    if (tableNames.includes('users')) {
+        const [columns] = await connection.query('SHOW COLUMNS FROM users');
+        const columnNames = columns.map(c => c.Field);
+        const requiredColumns = ['job_title', 'phone', 'avatar', 'identity_document'];
+        const missingColumns = requiredColumns.filter(c => !columnNames.includes(c));
+        
+        if (missingColumns.length > 0) {
+             report.dataIssues.push(`Users table missing columns: ${missingColumns.join(', ')}`);
+             report.tables.users_needs_migration = true;
         }
     }
 

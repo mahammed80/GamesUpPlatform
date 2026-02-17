@@ -34,6 +34,10 @@ CREATE TABLE IF NOT EXISTS users (
   password_hash VARCHAR(255) NOT NULL,
   name VARCHAR(255),
   role VARCHAR(50) DEFAULT 'user',
+  job_title VARCHAR(100),
+  phone VARCHAR(50),
+  avatar VARCHAR(255),
+  identity_document VARCHAR(255),
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -98,6 +102,14 @@ CREATE TABLE IF NOT EXISTS banners (
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE IF NOT EXISTS roles (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  name VARCHAR(50) UNIQUE NOT NULL,
+  permissions JSON,
+  description TEXT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE TABLE IF NOT EXISTS categories (
   id INT AUTO_INCREMENT PRIMARY KEY,
   name VARCHAR(255) NOT NULL,
@@ -113,6 +125,12 @@ ALTER TABLE products ADD COLUMN sub_category_slug VARCHAR(255);
 ALTER TABLE products ADD COLUMN cost DECIMAL(10, 2);
 ALTER TABLE products ADD COLUMN attributes JSON;
 ALTER TABLE products MODIFY digital_items JSON;
+
+-- Ensure users table has all required columns (for existing installs)
+ALTER TABLE users ADD COLUMN job_title VARCHAR(100);
+ALTER TABLE users ADD COLUMN phone VARCHAR(50);
+ALTER TABLE users ADD COLUMN avatar VARCHAR(255);
+ALTER TABLE users ADD COLUMN identity_document VARCHAR(255);
 
 -- Ensure icon is TEXT for existing tables
 ALTER TABLE categories MODIFY icon TEXT;
