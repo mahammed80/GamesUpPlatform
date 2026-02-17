@@ -1611,6 +1611,13 @@ app.post(`${BASE_PATH}/system/categories`, async (req, res) => {
       });
     }
 
+    if (error.code === 'ER_DATA_TOO_LONG' || error.code === 'WARN_DATA_TRUNCATED') {
+        return res.status(400).json({
+            error: 'Data too long',
+            details: 'The icon image is too large for the database. Please run the schema fix at /fix-db-schema.'
+        });
+    }
+
     res.status(500).json({ 
       error: 'Failed to create category',
       details: error.message,
@@ -1637,6 +1644,13 @@ app.put(`${BASE_PATH}/system/categories/:id`, async (req, res) => {
         error: 'Category already exists',
         details: 'A category with this slug or name already exists' 
       });
+    }
+
+    if (error.code === 'ER_DATA_TOO_LONG' || error.code === 'WARN_DATA_TRUNCATED') {
+        return res.status(400).json({
+            error: 'Data too long',
+            details: 'The icon image is too large for the database. Please run the schema fix at /fix-db-schema.'
+        });
     }
 
     res.status(500).json({ 
