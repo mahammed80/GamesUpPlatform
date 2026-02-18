@@ -494,13 +494,42 @@ app.post(`${BASE_PATH}/upload`, upload.single('image'), (req, res) => {
       return res.status(400).json({ error: 'No file uploaded' });
     }
     
-    // Use PUBLIC_URL from env if set (e.g., https://games-up.co/api), otherwise construct from request
-    // This is crucial for when the backend is mounted at a subpath (like /api)
-    const baseUrl = process.env.PUBLIC_URL || `${req.protocol}://${req.get('host')}`;
-    // Ensure no double slashes if baseUrl has trailing slash
-    const finalBaseUrl = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
+    // Check if we are in Hostinger environment (uploads are in root uploads/)
+    // On Hostinger, backend is in /backend/ and uploads are symlinked or in /uploads/
+    // The static middleware serves from __dirname/uploads
+    // But the public URL might need to be https://games-up.co/uploads/filename
     
-    const fileUrl = `${finalBaseUrl}/uploads/${req.file.filename}`;
+    // If PUBLIC_URL is https://games-up.co (root domain), and we serve uploads via express.static at /uploads
+    // Then the URL should be https://games-up.co/uploads/filename
+    // However, on Hostinger with subfolder deployment, the backend might be at https://games-up.co/functions/v1/make-server...
+    // We need to ensure the returned URL is accessible publicly
+    
+    // FIX: If we are on production/Hostinger, we might want to return a URL that maps to the public uploads folder
+    // If uploads are in public_html/uploads, they are accessible at domain.com/uploads/filename
+    
+    let fileUrl;
+    if (process.env.NODE_ENV === 'production' || process.env.PUBLIC_URL) {
+         // Production / Hostinger
+         // Assume uploads are served from root domain /uploads
+         // If PUBLIC_URL is the API base (e.g. domain.com/api), we might want just domain.com/uploads
+         // But let's stick to the relative path or absolute path based on configuration.
+         
+         // Safest bet for Hostinger with shared hosting structure:
+         // If we are uploading to public_html/uploads (via symlink or direct), URL is https://games-up.co/uploads/filename
+         
+         const domain = 'https://games-up.co'; // Hardcoded fallback or env
+         fileUrl = `${domain}/uploads/${req.file.filename}`;
+    } else {
+         // Local development
+         // Use PUBLIC_URL from env if set (e.g., https://games-up.co/api), otherwise construct from request
+         // This is crucial for when the backend is mounted at a subpath (like /api)
+         const baseUrl = process.env.PUBLIC_URL || `${req.protocol}://${req.get('host')}`;
+         // Ensure no double slashes if baseUrl has trailing slash
+         const finalBaseUrl = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
+         
+         fileUrl = `${finalBaseUrl}/uploads/${req.file.filename}`;
+    }
+
     res.json({ url: fileUrl });
   } catch (error) {
     console.error('Error uploading file:', error);
