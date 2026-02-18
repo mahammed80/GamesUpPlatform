@@ -146,7 +146,6 @@ app.use('/uploads', express.static(uploadDir, {
   }
 }));
 
-// Handle missing files in uploads directory explicitly to avoid falling back to index.html or other routes
 app.use('/uploads', (req, res) => {
   res.status(404).send('File not found');
 });
@@ -169,7 +168,7 @@ const storage = multer.diskStorage({
 
 const upload = multer({ 
   storage: storage,
-  limits: { fileSize: 5 * 1024 * 1024 } // Limit file size to 5MB
+  limits: { fileSize: 5 * 1024 * 1024 }
 })
 
 // Database connection - support both local and production
@@ -186,6 +185,17 @@ const pool = mysql.createPool({
   queueLimit: 0,
   multipleStatements: true
 });
+
+let ordersTableColumnsCache = null;
+
+const getOrdersTableColumns = async () => {
+  if (ordersTableColumnsCache) {
+    return ordersTableColumnsCache;
+  }
+  const [rows] = await pool.query('SHOW COLUMNS FROM orders');
+  ordersTableColumnsCache = new Set(rows.map(row => row.Field));
+  return ordersTableColumnsCache;
+};
 
 // Test database connection
 (async () => {
@@ -809,6 +819,14 @@ app.post(`${BASE_PATH}/customer-orders`, async (req, res) => {
     await connection.beginTransaction();
 
     const { customerEmail, customerName, items, total, deliveryMethod, shippingAddress, paymentMethod, paymentProof } = req.body;
+    if (!customerEmail || !customerName) {
+      await connection.rollback();
+      return res.status(400).json({ error: 'Customer name and email are required' });
+    }
+    if (!Array.isArray(items) || items.length === 0) {
+      await connection.rollback();
+      return res.status(400).json({ error: 'Items are required' });
+    }
     const orderNumber = `ORD-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
     const purchasedItems = [];
     const digitalKeys = [];
@@ -818,6 +836,12 @@ app.post(`${BASE_PATH}/customer-orders`, async (req, res) => {
     const isManualPayment = ['cod', 'instapay', 'vodafone_cash', 'telda'].includes(paymentMethod);
     const isCard = paymentMethod === 'card';
     const initialStatus = isPOS ? 'completed' : (isManualPayment ? 'pending' : 'pending_payment');
+    const ordersColumns = await getOrdersTableColumns();
+    const requiredColumns = ['order_number', 'customer_name', 'customer_email', 'product_name', 'date', 'status', 'amount'];
+    const missingRequired = requiredColumns.filter(col => !ordersColumns.has(col));
+    if (missingRequired.length > 0) {
+      throw new Error(`Orders table missing columns: ${missingRequired.join(', ')}`);
+    }
 
     // Process each item in the cart
     for (const item of items) {
@@ -861,28 +885,35 @@ app.post(`${BASE_PATH}/customer-orders`, async (req, res) => {
         }
 
         // Insert order record
+        const orderDate = new Date();
+        const columns = [];
+        const values = [];
+        const addCol = (col, value) => {
+          if (ordersColumns.has(col)) {
+            columns.push(col);
+            values.push(value);
+          }
+        };
+
+        addCol('order_number', orderNumber);
+        addCol('customer_name', customerName);
+        addCol('customer_email', customerEmail);
+        addCol('product_name', product.name);
+        addCol('date', orderDate);
+        addCol('status', initialStatus);
+        addCol('amount', product.price);
+        addCol('digital_email', assignNow && assignedKey ? assignedKey.email : null);
+        addCol('digital_password', assignNow && assignedKey ? assignedKey.password : null);
+        addCol('digital_code', assignNow && assignedKey ? assignedKey.code : null);
+        addCol('inventory_id', isPOS ? 'POS' : null);
+        addCol('payment_method', paymentMethod || null);
+        addCol('payment_proof', paymentProof || null);
+        addCol('shipping_address', JSON.stringify(shippingAddress || {}));
+
+        const placeholders = columns.map(() => '?').join(', ');
         await connection.query(
-          `INSERT INTO orders (
-            order_number, customer_name, customer_email, product_name, 
-            date, status, amount, 
-            digital_email, digital_password, digital_code, inventory_id,
-            payment_method, payment_proof, shipping_address
-          ) VALUES (?, ?, ?, ?, NOW(), ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          [
-            orderNumber, 
-            customerName, 
-            customerEmail, 
-            product.name,
-            initialStatus, 
-            product.price, 
-            assignNow && assignedKey ? assignedKey.email : null,
-            assignNow && assignedKey ? assignedKey.password : null,
-            assignNow && assignedKey ? assignedKey.code : null,
-            isPOS ? 'POS' : null,
-            paymentMethod || null,
-            paymentProof || null,
-            JSON.stringify(shippingAddress || {})
-          ]
+          `INSERT INTO orders (${columns.join(', ')}) VALUES (${placeholders})`,
+          values
         );
 
         purchasedItems.push({
