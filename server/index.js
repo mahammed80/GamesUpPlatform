@@ -197,6 +197,39 @@ const pool = mysql.createPool({
   }
 })();
 
+// Database Connection Test Route
+app.get('/test-db-connection', async (req, res) => {
+  try {
+    const connection = await pool.getConnection();
+    const [rows] = await connection.query('SELECT 1 as val');
+    connection.release();
+    res.json({
+      status: 'success',
+      message: 'Connected to database successfully',
+      config: {
+        host: process.env.DB_HOST || 'localhost',
+        user: process.env.DB_USER,
+        database: process.env.DB_NAME,
+        port: process.env.DB_PORT || 3306
+      },
+      test_query_result: rows[0].val
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: 'error',
+      message: error.message,
+      code: error.code,
+      config: {
+        host: process.env.DB_HOST || 'localhost',
+        user: process.env.DB_USER,
+        database: process.env.DB_NAME,
+        port: process.env.DB_PORT || 3306
+      },
+      hint: 'Check if DB_PASSWORD in .env is correct and quoted if it contains special characters like #.'
+    });
+  }
+});
+
 // Basic Routes to mimic the Supabase Function structure
 // This allows for a smoother transition
 
