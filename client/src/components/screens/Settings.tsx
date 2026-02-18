@@ -3,6 +3,7 @@ import { Card } from '../ui/card';
 import { Button } from '../ui/button';
 import { Save } from 'lucide-react';
 import { useStoreSettings } from '../../context/StoreSettingsContext';
+import { BASE_URL } from '../../utils/api';
 
 export function Settings() {
   const { settings, updateSettings } = useStoreSettings();
@@ -23,6 +24,7 @@ export function Settings() {
     business_hours: [] as { day: string; open: string; close: string }[],
     payment_methods: [] as { name: string; enabled: boolean }[],
   });
+  const [faviconFile, setFaviconFile] = useState<File | null>(null);
 
   useEffect(() => {
     if (settings) {
@@ -96,6 +98,29 @@ export function Settings() {
         bh.day === day ? { ...bh, [field]: value } : bh
       )
     }));
+  };
+
+  const handleFaviconUpload = async () => {
+    if (!faviconFile) return;
+
+    const formDataUpload = new FormData();
+    formDataUpload.append('image', faviconFile);
+
+    try {
+      const response = await fetch(`${BASE_URL}/upload`, {
+        method: 'POST',
+        body: formDataUpload,
+      });
+
+      if (!response.ok) throw new Error('Upload failed');
+
+      const data = await response.json();
+      setFormData(prev => ({ ...prev, website_favicon: data.url }));
+      setFaviconFile(null);
+    } catch (error) {
+      console.error('Error uploading favicon:', error);
+      alert('Failed to upload favicon');
+    }
   };
 
 
@@ -210,6 +235,27 @@ export function Settings() {
                   placeholder="https://example.com/favicon.png"
                   className="w-full px-4 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
+                <div className="mt-2 flex items-center gap-3">
+                  <input
+                    type="file"
+                    accept="image/png"
+                    onChange={(e) => setFaviconFile(e.target.files?.[0] || null)}
+                    className="hidden"
+                    id="favicon-upload"
+                  />
+                  <label
+                    htmlFor="favicon-upload"
+                    className="cursor-pointer flex items-center justify-center px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 text-sm"
+                  >
+                    Choose PNG
+                  </label>
+                  <Button type="button" onClick={handleFaviconUpload} className="bg-red-600 hover:bg-red-700 text-white">
+                    Upload Icon
+                  </Button>
+                  {(faviconFile || formData.website_favicon) && (
+                    <span className="text-xs text-green-500">Selected</span>
+                  )}
+                </div>
               </div>
             </div>
           </Card>
