@@ -513,6 +513,23 @@ app.post(`${BASE_PATH}/upload`, upload.single('image'), (req, res) => {
     if (!req.file) {
       return res.status(400).json({ error: 'No file uploaded' });
     }
+
+    if (process.env.NODE_ENV === 'production' || process.env.PUBLIC_URL) {
+      const publicHtmlPath = path.join(__dirname, '../public_html');
+      if (fs.existsSync(publicHtmlPath)) {
+        const publicHtmlUploads = path.join(publicHtmlPath, 'uploads');
+        if (!fs.existsSync(publicHtmlUploads)) {
+          fs.mkdirSync(publicHtmlUploads, { recursive: true });
+        }
+        const sourcePath = req.file.path;
+        const targetPath = path.join(publicHtmlUploads, req.file.filename);
+        try {
+          fs.copyFileSync(sourcePath, targetPath);
+        } catch (copyError) {
+          return res.status(500).json({ error: 'Failed to store upload', details: copyError.message });
+        }
+      }
+    }
     
     // Check if we are in Hostinger environment (uploads are in root uploads/)
     // On Hostinger, backend is in /backend/ and uploads are symlinked or in /uploads/
