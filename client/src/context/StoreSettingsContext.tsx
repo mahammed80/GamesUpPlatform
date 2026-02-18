@@ -5,6 +5,9 @@ interface StoreSettings {
   currency_code: string;
   currency_symbol: string;
   tax_rate: number;
+  website_title?: string;
+  website_description?: string;
+  website_favicon?: string;
   store_name?: string;
   store_email?: string;
   store_phone?: string;
@@ -25,6 +28,9 @@ const defaultSettings: StoreSettings = {
   currency_code: 'USD',
   currency_symbol: '$',
   tax_rate: 8.5,
+  website_title: '',
+  website_description: '',
+  website_favicon: '',
   store_name: '',
   store_email: '',
   store_phone: '',
@@ -62,6 +68,9 @@ export function StoreSettingsProvider({ children }: { children: ReactNode }) {
         currency_code: data.currency_code || 'USD',
         currency_symbol: data.currency_symbol || '$',
         tax_rate: parseFloat(data.tax_rate) || 0,
+        website_title: data.website_title || '',
+        website_description: data.website_description || '',
+        website_favicon: data.website_favicon || '',
         store_name: data.store_name || '',
         store_email: data.store_email || '',
         store_phone: data.store_phone || '',

@@ -13,6 +13,9 @@ export function Settings() {
     currency_code: 'USD',
     currency_symbol: '$',
     tax_rate: 8.5,
+    website_title: '',
+    website_description: '',
+    website_favicon: '',
     store_name: '',
     store_email: '',
     store_phone: '',
@@ -41,6 +44,9 @@ export function Settings() {
         currency_code: settings.currency_code,
         currency_symbol: settings.currency_symbol,
         tax_rate: settings.tax_rate,
+        website_title: settings.website_title || '',
+        website_description: settings.website_description || '',
+        website_favicon: settings.website_favicon || '',
         store_name: settings.store_name || '',
         store_email: settings.store_email || '',
         store_phone: settings.store_phone || '',
@@ -174,6 +180,36 @@ export function Settings() {
                   className="w-full px-4 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
                   rows={3}
                 ></textarea>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Website Title</label>
+                <input
+                  type="text"
+                  value={formData.website_title}
+                  onChange={(e) => setFormData({ ...formData, website_title: e.target.value })}
+                  placeholder="Games Up"
+                  className="w-full px-4 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Website Description</label>
+                <textarea
+                  value={formData.website_description}
+                  onChange={(e) => setFormData({ ...formData, website_description: e.target.value })}
+                  placeholder="Your ultimate destination for gaming products and digital goods."
+                  className="w-full px-4 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                  rows={3}
+                ></textarea>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Favicon URL</label>
+                <input
+                  type="text"
+                  value={formData.website_favicon}
+                  onChange={(e) => setFormData({ ...formData, website_favicon: e.target.value })}
+                  placeholder="https://example.com/favicon.png"
+                  className="w-full px-4 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
               </div>
             </div>
           </Card>

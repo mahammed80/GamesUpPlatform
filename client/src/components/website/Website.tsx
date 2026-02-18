@@ -10,6 +10,7 @@ import { Profile } from './Profile';
 import { MyOrders } from './MyOrders';
 import { Favorites } from './Favorites';
 import { TrackOrder } from './TrackOrder';
+import { useStoreSettings } from '../../context/StoreSettingsContext';
 
 type Page = 'home' | 'shop' | 'product' | 'login' | 'signup' | 'checkout' | 'profile' | 'orders' | 'favorites' | 'track';
 
@@ -18,6 +19,7 @@ export function Website() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [isCartOpen, setIsCartOpen] = useState(false);
+  const { settings } = useStoreSettings();
 
   const getCurrentPage = (): Page => {
     const path = location.pathname;
@@ -88,6 +90,32 @@ export function Website() {
     
     localStorage.setItem('cart', JSON.stringify(cart));
   };
+
+  useEffect(() => {
+    if (settings.website_title) {
+      document.title = settings.website_title;
+    }
+
+    if (settings.website_description) {
+      let meta = document.querySelector('meta[name="description"]') as HTMLMetaElement | null;
+      if (!meta) {
+        meta = document.createElement('meta');
+        meta.name = 'description';
+        document.head.appendChild(meta);
+      }
+      meta.content = settings.website_description;
+    }
+
+    if (settings.website_favicon) {
+      let link = document.querySelector('link[rel="icon"]') as HTMLLinkElement | null;
+      if (!link) {
+        link = document.createElement('link');
+        link.rel = 'icon';
+        document.head.appendChild(link);
+      }
+      link.href = settings.website_favicon;
+    }
+  }, [settings.website_title, settings.website_description, settings.website_favicon]);
 
   // Check if we need auth pages
   if (currentPage === 'login' || currentPage === 'signup') {
