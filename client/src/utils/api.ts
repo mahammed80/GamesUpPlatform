@@ -102,14 +102,14 @@ export const productsAPI = {
     if (search) params.append('search', search);
     return fetchAPI(`/public/products?${params.toString()}`);
   },
-  create: (data: FormData) => fetchAPI('/products', {
+  create: (data: FormData | any) => fetchAPI('/products', {
     method: 'POST',
-    body: JSON.stringify(Object.fromEntries(data)), // Convert FormData to JSON for now as backend expects JSON
+    body: data instanceof FormData ? JSON.stringify(Object.fromEntries(data)) : JSON.stringify(data),
     headers: { 'Content-Type': 'application/json' }
   }),
-  update: (id: string | number, data: FormData) => fetchAPI(`/products/${id}`, {
+  update: (id: string | number, data: FormData | any) => fetchAPI(`/products/${id}`, {
     method: 'PUT',
-    body: JSON.stringify(Object.fromEntries(data)),
+    body: data instanceof FormData ? JSON.stringify(Object.fromEntries(data)) : JSON.stringify(data),
     headers: { 'Content-Type': 'application/json' }
   }),
   delete: (id: string | number) => fetchAPI(`/products/${id}`, { method: 'DELETE' }),
