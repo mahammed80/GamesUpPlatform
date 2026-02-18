@@ -2757,6 +2757,22 @@ async function runMigrations() {
       )
     `);
 
+    const defaultSettings = {
+      currency_code: 'USD',
+      currency_symbol: '$',
+      tax_rate: '8.5',
+      website_title: '',
+      website_description: '',
+      website_favicon: ''
+    };
+
+    for (const [key, value] of Object.entries(defaultSettings)) {
+      const [rows] = await connection.query('SELECT * FROM settings WHERE setting_key = ?', [key]);
+      if (rows.length === 0) {
+        await connection.query('INSERT INTO settings (setting_key, setting_value) VALUES (?, ?)', [key, value]);
+      }
+    }
+
     // 2. Notifications Table
     await connection.query(`
       CREATE TABLE IF NOT EXISTS notifications (

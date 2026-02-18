@@ -34,7 +34,10 @@ async function migrate() {
     const defaultSettings = {
       'currency_code': 'USD',
       'currency_symbol': '$',
-      'tax_rate': '8.5'
+      'tax_rate': '8.5',
+      'website_title': '',
+      'website_description': '',
+      'website_favicon': ''
     };
 
     for (const [key, value] of Object.entries(defaultSettings)) {
