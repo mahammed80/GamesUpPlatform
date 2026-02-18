@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { BASE_URL } from '../utils/api';
+import { settingsAPI } from '../utils/api';
 
 interface StoreSettings {
   currency_code: string;
@@ -41,37 +41,34 @@ export function StoreSettingsProvider({ children }: { children: ReactNode }) {
 
   const fetchSettings = async () => {
     try {
-      const response = await fetch(`${BASE_URL}/settings`);
-      if (response.ok) {
-        const data = await response.json();
-        
-        // Parse JSON strings for complex objects
-        let business_hours = [];
-        try {
-          business_hours = data.business_hours ? JSON.parse(data.business_hours) : [];
-        } catch (e) {
-          console.error('Failed to parse business_hours', e);
-        }
-
-        let payment_methods = [];
-        try {
-          payment_methods = data.payment_methods ? JSON.parse(data.payment_methods) : [];
-        } catch (e) {
-          console.error('Failed to parse payment_methods', e);
-        }
-
-        setSettings({
-          currency_code: data.currency_code || 'USD',
-          currency_symbol: data.currency_symbol || '$',
-          tax_rate: parseFloat(data.tax_rate) || 0,
-          store_name: data.store_name || '',
-          store_email: data.store_email || '',
-          store_phone: data.store_phone || '',
-          store_address: data.store_address || '',
-          business_hours,
-          payment_methods,
-        });
+      const data = await settingsAPI.get();
+      
+      // Parse JSON strings for complex objects
+      let business_hours = [];
+      try {
+        business_hours = data.business_hours ? JSON.parse(data.business_hours) : [];
+      } catch (e) {
+        console.error('Failed to parse business_hours', e);
       }
+
+      let payment_methods = [];
+      try {
+        payment_methods = data.payment_methods ? JSON.parse(data.payment_methods) : [];
+      } catch (e) {
+        console.error('Failed to parse payment_methods', e);
+      }
+
+      setSettings({
+        currency_code: data.currency_code || 'USD',
+        currency_symbol: data.currency_symbol || '$',
+        tax_rate: parseFloat(data.tax_rate) || 0,
+        store_name: data.store_name || '',
+        store_email: data.store_email || '',
+        store_phone: data.store_phone || '',
+        store_address: data.store_address || '',
+        business_hours,
+        payment_methods,
+      });
     } catch (error) {
       console.error('Failed to fetch settings:', error);
     } finally {
@@ -97,15 +94,7 @@ export function StoreSettingsProvider({ children }: { children: ReactNode }) {
         serverData.payment_methods = JSON.stringify(serverData.payment_methods);
       }
 
-      const response = await fetch(`${BASE_URL}/settings`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(serverData),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to update settings');
-      }
+      await settingsAPI.update(serverData);
       
       await fetchSettings(); // Refresh to ensure sync
     } catch (error) {

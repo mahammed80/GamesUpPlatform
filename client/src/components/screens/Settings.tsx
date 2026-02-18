@@ -403,7 +403,7 @@ export function Settings() {
 
       {/* Save Button */}
       <div className="flex justify-end">
-        <Button onClick={handleSave}>
+        <Button onClick={handleSave} className="bg-red-600 hover:bg-red-700 text-white">
           <Save className="w-4 h-4 mr-2" />
           Save Changes
         </Button>

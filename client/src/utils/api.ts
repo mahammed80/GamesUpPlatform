@@ -172,7 +172,7 @@ export const teamAPI = {
 export const settingsAPI = {
   get: () => fetchAPI('/settings'),
   update: (settings: any) => fetchAPI('/settings', {
-    method: 'PUT',
+    method: 'POST',
     body: JSON.stringify(settings),
   }),
 };
