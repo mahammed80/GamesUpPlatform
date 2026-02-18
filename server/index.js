@@ -659,9 +659,24 @@ app.post(`${BASE_PATH}/auth/login`, async (req, res) => {
 // Setup Accounts (Missing Endpoint)
 app.post(`${BASE_PATH}/setup-accounts`, async (req, res) => {
   try {
-    // This endpoint seems to be for initial setup or verification
-    // We can return success since we already seeded the database
-    res.json({ success: true, message: 'Accounts setup verified' });
+    res.json({
+      success: true,
+      message: 'Accounts setup verified',
+      credentials: {
+        admin: {
+          email: 'admin@gamesup.com',
+          password: 'admin123'
+        },
+        manager: {
+          email: 'manager@gamesup.com',
+          password: 'manager123'
+        },
+        staff: {
+          email: 'staff@gamesup.com',
+          password: 'staff123'
+        }
+      }
+    });
   } catch (error) {
     console.error('Setup accounts error:', error);
     res.status(500).json({ error: 'Failed to setup accounts' });
@@ -2206,26 +2221,6 @@ app.get(`${BASE_PATH}/hr/attendance`, async (req, res) => {
 });
 
 // Setup Accounts (Placeholder to silence frontend error)
-app.post(`${BASE_PATH}/setup-accounts`, (req, res) => {
-  res.json({
-    message: 'Accounts setup logic handled by seeders',
-    credentials: {
-      admin: {
-        email: 'admin@gamesup.com',
-        password: 'password123'
-      },
-      manager: {
-        email: 'manager@gamesup.com',
-        password: 'password123'
-      },
-      staff: {
-        email: 'staff@gamesup.com',
-        password: 'password123'
-      }
-    }
-  });
-});
-
 // Roles Routes
 app.get(`${BASE_PATH}/roles`, async (req, res) => {
   try {
@@ -2919,6 +2914,22 @@ async function runMigrations() {
         if (!userFields.includes('identity_document')) await connection.query('ALTER TABLE users ADD COLUMN identity_document VARCHAR(255)');
     } catch (e) {
         console.error('Error fixing users schema:', e);
+    }
+
+    const defaultAdminUsers = [
+      { email: 'admin@gamesup.com', password: 'admin123', name: 'Admin User', role: 'admin' },
+      { email: 'manager@gamesup.com', password: 'manager123', name: 'Manager User', role: 'manager' },
+      { email: 'staff@gamesup.com', password: 'staff123', name: 'Staff User', role: 'staff' }
+    ];
+
+    for (const user of defaultAdminUsers) {
+      const passwordHash = await bcrypt.hash(user.password, 10);
+      await connection.query(
+        `INSERT INTO users (email, password_hash, name, role)
+         VALUES (?, ?, ?, ?)
+         ON DUPLICATE KEY UPDATE password_hash = VALUES(password_hash), name = VALUES(name), role = VALUES(role)`,
+        [user.email, passwordHash, user.name, user.role]
+      );
     }
 
     // 7. Orders Table
