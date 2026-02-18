@@ -146,6 +146,11 @@ app.use('/uploads', express.static(uploadDir, {
   }
 }));
 
+// Handle missing files in uploads directory explicitly to avoid falling back to index.html or other routes
+app.use('/uploads', (req, res) => {
+  res.status(404).send('File not found');
+});
+
 // Configure multer
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
@@ -162,7 +167,10 @@ const storage = multer.diskStorage({
   }
 })
 
-const upload = multer({ storage: storage })
+const upload = multer({ 
+  storage: storage,
+  limits: { fileSize: 5 * 1024 * 1024 } // Limit file size to 5MB
+})
 
 // Database connection - support both local and production
 const isProduction = process.env.NODE_ENV === 'production' || process.env.DB_HOST !== 'localhost';

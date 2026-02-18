@@ -21,6 +21,7 @@ export function getAccessToken() {
 
 async function fetchAPI(endpoint: string, options: RequestInit = {}) {
   const token = accessToken || publicAnonKey;
+  console.log(`[API v1.2] Fetching: ${endpoint}`); // Version tracking log
   
   const headers: HeadersInit = {
     'Content-Type': 'application/json',
