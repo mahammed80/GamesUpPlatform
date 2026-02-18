@@ -3435,3 +3435,19 @@ body {
 .admin-panel label {
   color: #9ca3af;
 }
+
+.admin-panel button,
+.admin-panel [data-slot="button"] {
+  background-color: #dc2626;
+  color: #ffffff;
+}
+
+.admin-panel button:hover,
+.admin-panel [data-slot="button"]:hover {
+  background-color: #b91c1c;
+}
+
+.admin-panel button:disabled,
+.admin-panel [data-slot="button"]:disabled {
+  opacity: 0.5;
+}
