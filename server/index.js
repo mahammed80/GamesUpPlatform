@@ -2738,6 +2738,9 @@ app.get('*', (req, res) => {
   if (fs.existsSync(publicPath)) {
     const indexPath = path.join(finalPublicPath, 'index.html');
     console.log('Serving index.html from:', indexPath);
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
     res.sendFile(indexPath);
   } else {
     res.status(404).json({ error: 'Frontend not built. Run "npm run build" first.' });
