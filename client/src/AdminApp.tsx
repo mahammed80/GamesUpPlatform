@@ -101,7 +101,7 @@ export default function AdminApp() {
   }
 
   return (
-    <div className={isDarkMode ? 'dark' : ''}>
+    <div className={`${isDarkMode ? 'dark' : ''} admin-panel`}>
       <div className="flex h-screen bg-white dark:bg-gray-900 transition-colors">
         <Sidebar
           collapsed={sidebarCollapsed}

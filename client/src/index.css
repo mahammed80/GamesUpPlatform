@@ -3431,3 +3431,7 @@ body {
     transform: rotate(360deg);
   }
 }
+
+.admin-panel label {
+  color: #9ca3af;
+}
