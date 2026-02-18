@@ -4,7 +4,7 @@ import { Card } from '../ui/card';
 import { Button } from '../ui/button';
 import { Modal } from '../ui/Modal';
 import { Mail, Phone, Calendar, TrendingUp, Plus, Edit2, Trash2, Key, Upload, Shield, User, FileText } from 'lucide-react';
-import { BASE_URL } from '../../utils/api';
+import { BASE_URL, rolesAPI } from '../../utils/api';
 import { publicAnonKey } from '../../utils/supabase/info';
 
 interface User {
@@ -24,6 +24,7 @@ export function TeamMembers() {
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [roles, setRoles] = useState<string[]>(['admin', 'manager', 'staff']);
   
   // Form State
   const [formData, setFormData] = useState({
@@ -42,6 +43,7 @@ export function TeamMembers() {
 
   useEffect(() => {
     fetchUsers();
+    fetchRoles();
   }, []);
 
   const fetchUsers = async () => {
@@ -59,6 +61,21 @@ export function TeamMembers() {
       console.error('Error fetching users:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchRoles = async () => {
+    try {
+      const data = await rolesAPI.getAll();
+      const rolesArray = Array.isArray(data) ? data : Array.isArray((data as any)?.roles) ? (data as any).roles : [];
+      const roleNames = rolesArray
+        .map((role: any) => (typeof role === 'string' ? role : role?.name))
+        .filter((name: any) => typeof name === 'string' && name.length > 0);
+      const nextRoles = roleNames.length > 0 ? roleNames : ['admin', 'manager', 'staff'];
+      setRoles(nextRoles);
+      setFormData((prev) => (nextRoles.includes(prev.role) ? prev : { ...prev, role: nextRoles[0] }));
+    } catch (error) {
+      console.error('Error fetching roles:', error);
     }
   };
 
@@ -308,9 +325,11 @@ export function TeamMembers() {
                 onChange={(e) => setFormData({ ...formData, role: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
               >
-                <option value="admin">Admin</option>
-                <option value="manager">Manager</option>
-                <option value="staff">Staff</option>
+                {(formData.role && !roles.includes(formData.role) ? [formData.role, ...roles] : roles).map((role) => (
+                  <option key={role} value={role}>
+                    {role.replace(/_/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase())}
+                  </option>
+                ))}
               </select>
             </div>
             <div>
