@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { X, Minus, Plus, Trash2, ShoppingBag, ArrowRight } from 'lucide-react';
+import { productsAPI } from '../../utils/api';
 
 interface CartItem {
   id: string;
@@ -25,9 +26,33 @@ export function Cart({ isOpen, onClose, onCheckout, onNavigate }: CartProps) {
     loadCart();
   }, [isOpen]);
 
-  const loadCart = () => {
+  const loadCart = async () => {
     const cart = JSON.parse(localStorage.getItem('cart') || '[]');
-    setCartItems(cart);
+    if (cart.length === 0) {
+      setCartItems(cart);
+      return;
+    }
+
+    try {
+      const updatedCart = await Promise.all(
+        cart.map(async (item: CartItem) => {
+          try {
+            const data = await productsAPI.getById(item.id);
+            const product = data?.products?.[0];
+            if (product?.image && product.image !== item.image) {
+              return { ...item, image: product.image };
+            }
+            return item;
+          } catch {
+            return item;
+          }
+        })
+      );
+      setCartItems(updatedCart);
+      localStorage.setItem('cart', JSON.stringify(updatedCart));
+    } catch {
+      setCartItems(cart);
+    }
   };
 
   const updateQuantity = (id: string, newQuantity: number) => {

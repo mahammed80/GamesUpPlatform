@@ -97,6 +97,7 @@ export const authAPI = {
 // Products API
 export const productsAPI = {
   getAll: () => fetchAPI('/products'),
+  getById: (id: string | number) => fetchAPI(`/products?id=${id}`),
   getPublic: (category?: string, search?: string) => {
     const params = new URLSearchParams();
     if (category) params.append('category', category);
