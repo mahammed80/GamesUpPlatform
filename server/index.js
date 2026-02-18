@@ -153,10 +153,12 @@ const storage = multer.diskStorage({
     cb(null, uploadDir)
   },
   filename: function (req, file, cb) {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9)
-    // Sanitize filename: remove special chars, spaces, etc.
-    const sanitizedOriginalName = file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_');
-    cb(null, uniqueSuffix + '-' + sanitizedOriginalName)
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    // Get file extension
+    const ext = path.extname(file.originalname).toLowerCase();
+    // Use clean filename: timestamp-random.ext
+    // This avoids double extensions and special characters in filenames
+    cb(null, uniqueSuffix + ext);
   }
 })
 
