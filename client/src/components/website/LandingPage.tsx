@@ -308,14 +308,14 @@ export function LandingPage({ onNavigate, onOpenCart }: LandingPageProps) {
       {/* Modern Bento Grid Section */}
       <section className="py-16 bg-gray-50">
         <div className="w-full px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 auto-rows-[40vh] md:auto-rows-[40vh]">
+          <div className="grid grid-cols-1 md:grid-cols-2 md:grid-rows-2 gap-4 h-auto md:h-[80vh]">
             
-            {/* Main Feature - Left (Spans 1 col, 1 row) */}
+            {/* Main Feature - Left (Spans 1 col, 2 rows) */}
             <motion.div 
               initial={{ opacity: 0, x: -20 }}
               whileInView={{ opacity: 1, x: 0 }}
               viewport={{ once: true }}
-              className="col-span-1 md:row-span-1 relative rounded-2xl overflow-hidden group cursor-pointer"
+              className="col-span-1 md:row-span-2 relative rounded-2xl overflow-hidden group cursor-pointer h-[40vh] md:h-full"
               onClick={() => onNavigate('shop')}
             >
               <img 
@@ -323,7 +323,7 @@ export function LandingPage({ onNavigate, onOpenCart }: LandingPageProps) {
                 alt="Featured Gaming Gear" 
                 className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
               />
-              <div className="absolute inset-0 bg-black/50 group-hover:bg-black/40 transition-colors duration-300" /> {/* Dark overlay */}
+              <div className="absolute inset-0 bg-black/30 group-hover:bg-black/20 transition-colors duration-300" /> {/* Dark overlay */}
               <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent p-8 flex flex-col justify-end">
                 <span className="text-red-500 font-bold tracking-wider text-sm mb-2">PREMIUM GEAR</span>
                 <h3 className="text-white text-3xl font-bold mb-3">Level Up Your Setup</h3>
@@ -337,7 +337,7 @@ export function LandingPage({ onNavigate, onOpenCart }: LandingPageProps) {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ delay: 0.1 }}
-              className="col-span-1 md:row-span-1 relative rounded-2xl overflow-hidden group cursor-pointer"
+              className="col-span-1 md:row-span-1 relative rounded-2xl overflow-hidden group cursor-pointer h-[40vh] md:h-auto"
               onClick={() => onNavigate('shop')}
             >
               <img 
@@ -345,13 +345,33 @@ export function LandingPage({ onNavigate, onOpenCart }: LandingPageProps) {
                 alt="Console Gaming" 
                 className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
               />
-              <div className="absolute inset-0 bg-black/50 group-hover:bg-black/40 transition-colors duration-300" /> {/* Dark overlay */}
+              <div className="absolute inset-0 bg-black/30 group-hover:bg-black/20 transition-colors duration-300" /> {/* Dark overlay */}
               <div className="absolute inset-0 bg-gradient-to-r from-black/90 via-black/20 to-transparent p-8 flex flex-col justify-center">
                 <span className="text-red-500 font-bold tracking-wider text-sm mb-2">NEW ARRIVALS</span>
                 <h3 className="text-white text-3xl font-bold">Next-Gen Consoles</h3>
               </div>
             </motion.div>
 
+            {/* Third Feature - Bottom Right (Spans 1 col, 1 row) */}
+            <motion.div 
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ delay: 0.2 }}
+              className="col-span-1 md:row-span-1 relative rounded-2xl overflow-hidden group cursor-pointer h-[40vh] md:h-auto"
+              onClick={() => onNavigate('shop')}
+            >
+              <img 
+                src="/assets/red%20new%20bg.jpg" 
+                alt="Gaming Experience" 
+                className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+              />
+              <div className="absolute inset-0 bg-black/30 group-hover:bg-black/20 transition-colors duration-300" /> {/* Dark overlay */}
+              <div className="absolute inset-0 bg-gradient-to-r from-black/90 via-black/20 to-transparent p-8 flex flex-col justify-center">
+                <span className="text-red-500 font-bold tracking-wider text-sm mb-2">IMMERSIVE</span>
+                <h3 className="text-white text-3xl font-bold">Ultimate Experience</h3>
+              </div>
+            </motion.div>
           </div>
         </div>
       </section>
