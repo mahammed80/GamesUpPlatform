@@ -52,7 +52,26 @@ async function initDb() {
     if (fs.existsSync(schemaPath)) {
       const schema = fs.readFileSync(schemaPath, 'utf8');
       console.log('Executing schema...');
-      await connection.query(schema);
+      
+      // Split schema into individual statements
+      const statements = schema
+        .split(';')
+        .map(stmt => stmt.trim())
+        .filter(stmt => stmt.length > 0);
+
+      for (const statement of statements) {
+        try {
+          await connection.query(statement);
+        } catch (err) {
+          // Ignore "Duplicate column name" error (1060)
+          if (err.errno === 1060) {
+            console.log('Skipping duplicate column addition (already exists).');
+          } else {
+            console.error('Error executing statement:', statement);
+            throw err; // Re-throw other errors
+          }
+        }
+      }
       console.log('Schema executed successfully!');
     } else {
       console.error('Schema file not found at:', schemaPath);

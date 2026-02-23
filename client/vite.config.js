@@ -4,6 +4,7 @@ import path from 'path';
 
 export default defineConfig({
   base: '/',
+  publicDir: '../public',
   plugins: [react()],
   resolve: {
     extensions: ['.js', '.jsx', '.ts', '.tsx', '.json'],
@@ -111,6 +112,7 @@ export default defineConfig({
     chunkSizeWarningLimit: 1000,
   },
   server: {
+    host: true, // Expose to network
     port: 5173,
     open: true,
     proxy: {

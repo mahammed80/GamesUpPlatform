@@ -142,9 +142,15 @@ export function LandingPage({ onNavigate, onOpenCart }: LandingPageProps) {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Hero Banner */}
-      <section className="relative bg-gradient-to-br from-red-600 via-red-500 to-orange-500 overflow-hidden">
-        <div className="absolute inset-0 bg-black/10"></div>
-        <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGRlZnM+PHBhdHRlcm4gaWQ9ImdyaWQiIHdpZHRoPSI2MCIgaGVpZ2h0PSI2MCIgcGF0dGVyblVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+PHBhdGggZD0iTSAxMCAwIEwgMCAwIDAgMTAiIGZpbGw9Im5vbmUiIHN0cm9rZT0id2hpdGUiIHN0cm9rZS1vcGFjaXR5PSIwLjA1IiBzdHJva2Utd2lkdGg9IjEiLz48L3BhdHRlcm4+PC9kZWZzPjxyZWN0IHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiIGZpbGw9InVybCgjZ3JpZCkiLz48L3N2Zz4=')] opacity-30"></div>
+      <section className="relative overflow-hidden">
+        <div className="absolute inset-0">
+          <img 
+            src="/assets/red.jpg" 
+            alt="Hero Background" 
+            className="w-full h-full object-cover"
+          />
+          <div className="absolute inset-0 bg-black/50" />
+        </div>
         
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 md:py-32 relative z-10">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
@@ -299,6 +305,57 @@ export function LandingPage({ onNavigate, onOpenCart }: LandingPageProps) {
         </div>
       </section>
 
+      {/* Modern Bento Grid Section */}
+      <section className="py-16 bg-gray-50">
+        <div className="w-full px-4 sm:px-6 lg:px-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 auto-rows-[40vh] md:auto-rows-[40vh]">
+            
+            {/* Main Feature - Left (Spans 1 col, 1 row) */}
+            <motion.div 
+              initial={{ opacity: 0, x: -20 }}
+              whileInView={{ opacity: 1, x: 0 }}
+              viewport={{ once: true }}
+              className="col-span-1 md:row-span-1 relative rounded-2xl overflow-hidden group cursor-pointer"
+              onClick={() => onNavigate('shop')}
+            >
+              <img 
+                src="/assets/red%20banner%203.jpg" 
+                alt="Featured Gaming Gear" 
+                className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+              />
+              <div className="absolute inset-0 bg-black/50 group-hover:bg-black/40 transition-colors duration-300" /> {/* Dark overlay */}
+              <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent p-8 flex flex-col justify-end">
+                <span className="text-red-500 font-bold tracking-wider text-sm mb-2">PREMIUM GEAR</span>
+                <h3 className="text-white text-3xl font-bold mb-3">Level Up Your Setup</h3>
+                <p className="text-gray-200 text-base line-clamp-2 max-w-md">Discover our premium collection of gaming peripherals designed for pro players.</p>
+              </div>
+            </motion.div>
+
+            {/* Secondary Feature - Top Right (Spans 1 col, 1 row) */}
+            <motion.div 
+              initial={{ opacity: 0, y: -20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ delay: 0.1 }}
+              className="col-span-1 md:row-span-1 relative rounded-2xl overflow-hidden group cursor-pointer"
+              onClick={() => onNavigate('shop')}
+            >
+              <img 
+                src="/assets/red%20consolr.jpg" 
+                alt="Console Gaming" 
+                className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+              />
+              <div className="absolute inset-0 bg-black/50 group-hover:bg-black/40 transition-colors duration-300" /> {/* Dark overlay */}
+              <div className="absolute inset-0 bg-gradient-to-r from-black/90 via-black/20 to-transparent p-8 flex flex-col justify-center">
+                <span className="text-red-500 font-bold tracking-wider text-sm mb-2">NEW ARRIVALS</span>
+                <h3 className="text-white text-3xl font-bold">Next-Gen Consoles</h3>
+              </div>
+            </motion.div>
+
+          </div>
+        </div>
+      </section>
+
       {/* Featured Products */}
       <section className="py-16 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -411,38 +468,65 @@ export function LandingPage({ onNavigate, onOpenCart }: LandingPageProps) {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <motion.div
               whileHover={{ scale: 1.02 }}
-              className="bg-gradient-to-br from-red-600 to-red-500 rounded-2xl p-8 text-white"
+              className="relative rounded-2xl p-8 text-white overflow-hidden group"
             >
-              <Gamepad2 className="w-12 h-12 mb-4" />
-              <h3 className="text-2xl font-bold mb-2">New Arrivals</h3>
-              <p className="text-red-100 mb-4">Check out the latest gaming gear</p>
-              <button className="text-white font-semibold underline hover:no-underline">
-                Shop Now →
-              </button>
+              <img 
+                src="/assets/ps%20banner.jpg" 
+                alt="New Arrivals" 
+                className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+              />
+              <div className="absolute inset-0 bg-black/60 group-hover:bg-black/50 transition-colors" />
+              
+              <div className="relative z-10">
+                <Gamepad2 className="w-12 h-12 mb-4 text-red-500" />
+                <h3 className="text-2xl font-bold mb-2">New Arrivals</h3>
+                <p className="text-gray-200 mb-4">Check out the latest gaming gear</p>
+                <button className="text-white font-semibold underline hover:no-underline hover:text-red-400 transition-colors">
+                  Shop Now →
+                </button>
+              </div>
             </motion.div>
 
             <motion.div
               whileHover={{ scale: 1.02 }}
-              className="bg-gradient-to-br from-orange-600 to-orange-500 rounded-2xl p-8 text-white"
+              className="relative rounded-2xl p-8 text-white overflow-hidden group"
             >
-              <Star className="w-12 h-12 mb-4" />
-              <h3 className="text-2xl font-bold mb-2">Best Sellers</h3>
-              <p className="text-orange-100 mb-4">Top-rated products this month</p>
-              <button className="text-white font-semibold underline hover:no-underline">
-                View All →
-              </button>
+              <img 
+                src="/assets/banner%202.jpg" 
+                alt="Best Sellers" 
+                className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+              />
+              <div className="absolute inset-0 bg-black/60 group-hover:bg-black/50 transition-colors" />
+              
+              <div className="relative z-10">
+                <Star className="w-12 h-12 mb-4 text-orange-500" />
+                <h3 className="text-2xl font-bold mb-2">Best Sellers</h3>
+                <p className="text-gray-200 mb-4">Top-rated products this month</p>
+                <button className="text-white font-semibold underline hover:no-underline hover:text-orange-400 transition-colors">
+                  View All →
+                </button>
+              </div>
             </motion.div>
 
             <motion.div
               whileHover={{ scale: 1.02 }}
-              className="bg-gradient-to-br from-purple-600 to-purple-500 rounded-2xl p-8 text-white"
+              className="relative rounded-2xl p-8 text-white overflow-hidden group"
             >
-              <Headphones className="w-12 h-12 mb-4" />
-              <h3 className="text-2xl font-bold mb-2">Accessories</h3>
-              <p className="text-purple-100 mb-4">Enhance your gaming setup</p>
-              <button className="text-white font-semibold underline hover:no-underline">
-                Explore →
-              </button>
+              <img 
+                src="/assets/banner%203.jpg" 
+                alt="Accessories" 
+                className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+              />
+              <div className="absolute inset-0 bg-black/60 group-hover:bg-black/50 transition-colors" />
+              
+              <div className="relative z-10">
+                <Headphones className="w-12 h-12 mb-4 text-purple-500" />
+                <h3 className="text-2xl font-bold mb-2">Accessories</h3>
+                <p className="text-gray-200 mb-4">Enhance your gaming setup</p>
+                <button className="text-white font-semibold underline hover:no-underline hover:text-purple-400 transition-colors">
+                  Explore →
+                </button>
+              </div>
             </motion.div>
           </div>
         </div>
