@@ -22,13 +22,17 @@ const logError = (context, error) => {
 };
 
 // Load environment variables
-// Priority: 1. server/.env (local/production specific), 2. root .env (shared/dev)
+// Priority: 1. server/.env.local (local overrides), 2. server/.env (production/default), 3. root .env (shared/dev)
+const localEnvPath = path.resolve(__dirname, '.env.local');
 const serverEnvPath = path.resolve(__dirname, '.env');
 const rootEnvPath = path.resolve(__dirname, '../.env');
 
 let envResult;
 
-if (fs.existsSync(serverEnvPath)) {
+if (fs.existsSync(localEnvPath)) {
+  console.log('✅ Loading .env.local from server directory:', localEnvPath);
+  envResult = dotenv.config({ path: localEnvPath });
+} else if (fs.existsSync(serverEnvPath)) {
   console.log('✅ Loading .env from server directory:', serverEnvPath);
   envResult = dotenv.config({ path: serverEnvPath });
 } else if (fs.existsSync(rootEnvPath)) {

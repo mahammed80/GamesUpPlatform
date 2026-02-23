@@ -3,3 +3,5 @@ dist/
 client/node_modules/
 # Allow client .env for frontend variables
 !client/.env 
+*.local
+server/.env.local 
