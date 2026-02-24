@@ -247,6 +247,7 @@ app.get('/test-db-connection', async (req, res) => {
       status: 'success',
       message: 'Connected to database successfully',
       env_source: envSource,
+      server_version: '1.0.2',
       config: {
         host: dbHost,
         user: process.env.DB_USER,
@@ -261,6 +262,7 @@ app.get('/test-db-connection', async (req, res) => {
       message: error.message,
       code: error.code,
       env_source: envSource,
+      server_version: '1.0.2',
       config: {
         host: dbHost,
         user: process.env.DB_USER,
