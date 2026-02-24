@@ -552,6 +552,21 @@ app.get('/sync-uploads', (req, res) => {
       }
     });
 
+    // Copy favicon from build output if available
+    const buildPublic = path.join(__dirname, '../public');
+    const faviconSrc = path.join(buildPublic, 'favicon.ico');
+    const faviconDest = path.join(publicHtmlPath, 'favicon.ico');
+    
+    if (fs.existsSync(faviconSrc)) {
+        try {
+            fs.copyFileSync(faviconSrc, faviconDest);
+            copied++;
+        } catch (e) {
+            console.error('Failed to copy favicon:', e);
+            errors++;
+        }
+    }
+
     res.json({ 
       success: true, 
       message: `Sync completed. Copied ${copied} files. Errors: ${errors}`,
