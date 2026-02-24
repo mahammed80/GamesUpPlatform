@@ -545,18 +545,46 @@ app.post(`${BASE_PATH}/upload`, upload.single('image'), (req, res) => {
     }
 
     if (process.env.NODE_ENV === 'production' || process.env.PUBLIC_URL) {
-      const publicHtmlPath = path.join(__dirname, '../public_html');
-      if (fs.existsSync(publicHtmlPath)) {
+      const publicHtmlPath = findPublicHtml(__dirname);
+      if (publicHtmlPath) {
         const publicHtmlUploads = path.join(publicHtmlPath, 'uploads');
         if (!fs.existsSync(publicHtmlUploads)) {
-          fs.mkdirSync(publicHtmlUploads, { recursive: true });
+          // If it's a symlink, existSync returns true if target exists. 
+          // If broken symlink, it returns false.
+          // Safe to try mkdir with recursive
+          try {
+             fs.mkdirSync(publicHtmlUploads, { recursive: true });
+          } catch (e) {
+             // Ignore error if it exists
+          }
         }
-        const sourcePath = req.file.path;
-        const targetPath = path.join(publicHtmlUploads, req.file.filename);
+        
+        // Only copy if it's NOT a symlink pointing to our server/uploads
+        // To avoid "Source and destination are the same" error
+        let isSame = false;
         try {
-          fs.copyFileSync(sourcePath, targetPath);
-        } catch (copyError) {
-          return res.status(500).json({ error: 'Failed to store upload', details: copyError.message });
+            if (fs.existsSync(publicHtmlUploads)) {
+                const stats = fs.lstatSync(publicHtmlUploads);
+                if (stats.isSymbolicLink()) {
+                    const target = fs.readlinkSync(publicHtmlUploads);
+                    const absTarget = path.isAbsolute(target) ? target : path.resolve(path.dirname(publicHtmlUploads), target);
+                    const absSource = path.join(__dirname, 'uploads');
+                    if (absTarget === absSource) isSame = true;
+                }
+            }
+        } catch (e) {
+            console.error('Symlink check error:', e);
+        }
+
+        if (!isSame) {
+            const sourcePath = req.file.path;
+            const targetPath = path.join(publicHtmlUploads, req.file.filename);
+            try {
+              fs.copyFileSync(sourcePath, targetPath);
+            } catch (copyError) {
+              console.error('Failed to copy to public_html/uploads:', copyError);
+              // Don't fail the request, just log it. The file is in server/uploads anyway.
+            }
         }
       }
     }
