@@ -22,22 +22,31 @@ const logError = (context, error) => {
 };
 
 // Load environment variables
-// Priority: 1. server/.env.local (local overrides), 2. server/.env (production/default), 3. root .env (shared/dev)
+// Priority: 1. server/.env.local (local overrides), 2. server/.env.production (production specific), 3. server/.env (default), 4. root .env (fallback)
 const localEnvPath = path.resolve(__dirname, '.env.local');
+const productionEnvPath = path.resolve(__dirname, '.env.production');
 const serverEnvPath = path.resolve(__dirname, '.env');
 const rootEnvPath = path.resolve(__dirname, '../.env');
 
 let envResult;
+let envSource = 'none';
 
 if (fs.existsSync(localEnvPath)) {
   console.log('✅ Loading .env.local from server directory:', localEnvPath);
   envResult = dotenv.config({ path: localEnvPath });
+  envSource = '.env.local';
+} else if (fs.existsSync(productionEnvPath)) {
+  console.log('✅ Loading .env.production from server directory:', productionEnvPath);
+  envResult = dotenv.config({ path: productionEnvPath });
+  envSource = '.env.production';
 } else if (fs.existsSync(serverEnvPath)) {
   console.log('✅ Loading .env from server directory:', serverEnvPath);
   envResult = dotenv.config({ path: serverEnvPath });
+  envSource = '.env';
 } else if (fs.existsSync(rootEnvPath)) {
   console.log('⚠️  Server .env not found, falling back to root .env:', rootEnvPath);
   envResult = dotenv.config({ path: rootEnvPath });
+  envSource = 'root .env';
 } else {
   console.log('❌ No .env file found!');
   envResult = { error: new Error('No .env file found') };
@@ -230,6 +239,7 @@ app.get('/test-db-connection', async (req, res) => {
     res.json({
       status: 'success',
       message: 'Connected to database successfully',
+      env_source: envSource,
       config: {
         host: process.env.DB_HOST || 'localhost',
         user: process.env.DB_USER,
@@ -243,6 +253,7 @@ app.get('/test-db-connection', async (req, res) => {
       status: 'error',
       message: error.message,
       code: error.code,
+      env_source: envSource,
       config: {
         host: process.env.DB_HOST || 'localhost',
         user: process.env.DB_USER,
