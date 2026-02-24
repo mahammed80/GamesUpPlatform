@@ -59,8 +59,8 @@ if (envResult.error) {
 }
 
 // FORCE IPv4 override for localhost
-if (process.env.DB_HOST === 'localhost') {
-  console.warn('⚠️  DB_HOST is "localhost", forcing "127.0.0.1" to prevent IPv6 ::1 connection issues.');
+if (!process.env.DB_HOST || process.env.DB_HOST === 'localhost' || process.env.DB_HOST === '::1') {
+  console.warn(`⚠️  DB_HOST is "${process.env.DB_HOST || 'undefined'}", forcing "127.0.0.1" to prevent IPv6 ::1 connection issues.`);
   process.env.DB_HOST = '127.0.0.1';
 }
 
@@ -724,9 +724,43 @@ app.get(`${BASE_PATH}/settings`, async (req, res) => {
     
     // Ensure defaults if empty
     if (Object.keys(settings).length === 0) {
-       settings.currency_code = 'USD';
-       settings.currency_symbol = '$';
-       settings.tax_rate = '8.5';
+       console.log('⚠️ Settings table is empty, inserting defaults...');
+       const defaultSettings = {
+         currency_code: 'USD',
+         currency_symbol: '$',
+         tax_rate: '0',
+         site_title: 'GamesUp',
+         support_email: 'support@gamesup.co'
+       };
+       
+       // Update in-memory settings
+       Object.assign(settings, defaultSettings);
+       
+       // Async insert defaults to DB for next time
+       // We don't await this to keep response fast, but we catch errors
+       (async () => {
+         try {
+           const connection = await pool.getConnection();
+           try {
+             await connection.beginTransaction();
+             for (const [key, value] of Object.entries(defaultSettings)) {
+               await connection.query(
+                 'INSERT IGNORE INTO settings (setting_key, setting_value) VALUES (?, ?)',
+                 [key, value]
+               );
+             }
+             await connection.commit();
+             console.log('✅ Default settings inserted successfully');
+           } catch (err) {
+             await connection.rollback();
+             console.error('Failed to insert default settings:', err);
+           } finally {
+             connection.release();
+           }
+         } catch (connErr) {
+           console.error('Failed to get connection for settings seed:', connErr);
+         }
+       })();
     }
     
     res.json(settings);
