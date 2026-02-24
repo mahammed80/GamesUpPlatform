@@ -59,10 +59,9 @@ if (envResult.error) {
 }
 
 // FORCE IPv4 override for localhost
-if (!process.env.DB_HOST || process.env.DB_HOST === 'localhost' || process.env.DB_HOST === '::1') {
-  console.warn(`⚠️  DB_HOST is "${process.env.DB_HOST || 'undefined'}", forcing "127.0.0.1" to prevent IPv6 ::1 connection issues.`);
-  process.env.DB_HOST = '127.0.0.1';
-}
+// Removed hard override to 127.0.0.1 to allow 'localhost' socket connection if available,
+// but using family: 4 in pool config to prefer IPv4 if TCP is used.
+
 
 const paytabs = require('./services/paytabs');
 const oto = require('./services/oto');
@@ -195,10 +194,6 @@ const isProduction = process.env.NODE_ENV === 'production' || process.env.DB_HOS
 
 // Force IPv4 if DB_HOST is localhost to avoid ::1 (IPv6) connection issues
 let dbHost = process.env.DB_HOST || 'localhost';
-if (dbHost === 'localhost') {
-  dbHost = '127.0.0.1';
-  console.log('🔄 Converted localhost to 127.0.0.1 to force IPv4');
-}
 
 const pool = mysql.createPool({
   host: dbHost,
@@ -209,7 +204,8 @@ const pool = mysql.createPool({
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0,
-  multipleStatements: true
+  multipleStatements: true,
+  family: 4 // Force IPv4 lookup (avoids ::1) but keeps 'localhost' semantics
 });
 
 let ordersTableColumnsCache = null;
