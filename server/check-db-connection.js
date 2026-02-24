@@ -3,84 +3,96 @@ const dotenv = require('dotenv');
 const path = require('path');
 const fs = require('fs');
 
-// Load environment variables - mimicking server/index.js logic
-const serverEnvPath = path.resolve(__dirname, '.env');
-const rootEnvPath = path.resolve(__dirname, '../.env');
+console.log('🔍 Starting Database Connection Diagnostics...');
 
-console.log('--- Database Connection Check ---');
-console.log('Current Working Directory:', process.cwd());
-console.log('__dirname:', __dirname);
+// Load Environment Variables with priority
+const envFiles = ['.env.local', '.env.production', '.env', '../.env'];
+let loadedEnv = null;
 
-let envResult;
-if (fs.existsSync(serverEnvPath)) {
-  console.log('✅ Loading .env from server directory:', serverEnvPath);
-  envResult = dotenv.config({ path: serverEnvPath });
-} else if (fs.existsSync(rootEnvPath)) {
-  console.log('⚠️  Server .env not found, falling back to root .env:', rootEnvPath);
-  envResult = dotenv.config({ path: rootEnvPath });
-} else {
-  console.log('❌ No .env file found! Relying on process environment variables.');
+for (const file of envFiles) {
+  const envPath = path.resolve(__dirname, file);
+  if (fs.existsSync(envPath)) {
+    console.log(`✅ Loading environment from: ${file}`);
+    dotenv.config({ path: envPath });
+    loadedEnv = file;
+    break;
+  }
 }
 
-if (envResult && envResult.error) {
-  console.error('Dotenv error:', envResult.error);
+if (!loadedEnv) {
+  console.error('❌ No .env file found in server directory or parent!');
 }
 
-// Connection Configuration
 const config = {
   host: process.env.DB_HOST || 'localhost',
   user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD ? '****' : '(not set)', // Hide password in logs
+  password: process.env.DB_PASSWORD,
   database: process.env.DB_NAME,
   port: process.env.DB_PORT || 3306
 };
 
-console.log('Connection Config:', config);
+console.log('📋 Configuration loaded:');
+console.log(`   Host: ${config.host}`);
+console.log(`   User: ${config.user}`);
+console.log(`   Database: ${config.database}`);
+console.log(`   Port: ${config.port}`);
+console.log(`   Password: ${config.password ? '******' : '(not set)'}`);
 
-// Validate critical variables
-if (!process.env.DB_USER || !process.env.DB_NAME) {
-  console.error('❌ Missing DB_USER or DB_NAME environment variables.');
-  console.log('Please check your Hostinger Environment Variables configuration.');
-}
+async function testConnection(hostOverride = null) {
+  const testConfig = { ...config };
+  if (hostOverride) {
+    testConfig.host = hostOverride;
+    console.log(`\n🔄 Testing connection with forced host: ${hostOverride}...`);
+  } else {
+    console.log(`\n🔄 Testing connection with configured host: ${testConfig.host}...`);
+  }
 
-async function checkConnection() {
   try {
-    console.log('Attempting to connect...');
-    // Use createConnection for a single check instead of pool
-    const connection = await mysql.createConnection({
-      host: process.env.DB_HOST || 'localhost',
-      user: process.env.DB_USER,
-      password: process.env.DB_PASSWORD,
-      database: process.env.DB_NAME,
-      port: process.env.DB_PORT || 3306
-    });
-
-    console.log('✅ Successfully connected to MySQL Database!');
-    
-    const [rows] = await connection.query('SELECT NOW() as now, VERSION() as version');
-    console.log('⏰ Database Time:', rows[0].now);
-    console.log('MySQL Version:', rows[0].version);
-
+    const connection = await mysql.createConnection(testConfig);
+    console.log('✅ Connection SUCCESSFUL!');
+    const [rows] = await connection.execute('SELECT VERSION() as version');
+    console.log(`   Server Version: ${rows[0].version}`);
     await connection.end();
-    console.log('Connection closed.');
-    process.exit(0);
-  } catch (err) {
-    console.error('❌ Connection Failed:', err.message);
-    console.error('Error Code:', err.code);
-    console.error('Error No:', err.errno);
-    
-    if (err.code === 'ER_ACCESS_DENIED_ERROR') {
-      console.log('👉 Hint: Check your username and password.');
-    } else if (err.code === 'ENOTFOUND') {
-      console.log('👉 Hint: Check your DB_HOST (hostname).');
-    } else if (err.code === 'ECONNREFUSED') {
-      console.log('👉 Hint: Check if MySQL server is running and port is correct.');
-    } else if (err.code === 'ER_BAD_DB_ERROR') {
-      console.log('👉 Hint: Check if the database name is correct and exists.');
+    return true;
+  } catch (error) {
+    console.error('❌ Connection FAILED:');
+    console.error(`   Code: ${error.code}`);
+    console.error(`   Message: ${error.message}`);
+    if (error.code === 'ER_ACCESS_DENIED_ERROR') {
+      console.error('   👉 Check your username and password.');
+      if (testConfig.host === 'localhost' || testConfig.host === '127.0.0.1') {
+         console.error('   👉 Ensure the user is allowed to connect from localhost (127.0.0.1).');
+      } else {
+         console.error(`   👉 Ensure the user is allowed to connect from ${testConfig.host}.`);
+      }
+    } else if (error.code === 'ECONNREFUSED') {
+      console.error('   👉 Database server is not reachable on this port.');
     }
-
-    process.exit(1);
+    return false;
   }
 }
 
-checkConnection();
+(async () => {
+  // Test 1: Configured Host
+  let success = await testConnection();
+
+  // Test 2: Force 127.0.0.1 if failed and was localhost
+  if (!success && (config.host === 'localhost' || config.host === '::1')) {
+    console.log('\n⚠️  "localhost" failed. Attempting to force IPv4 (127.0.0.1)...');
+    success = await testConnection('127.0.0.1');
+  }
+
+  // Test 3: Force localhost if failed and was 127.0.0.1 (unlikely but possible)
+  if (!success && config.host === '127.0.0.1') {
+    console.log('\n⚠️  "127.0.0.1" failed. Attempting to force "localhost"...');
+    success = await testConnection('localhost');
+  }
+
+  if (success) {
+    console.log('\n✅ Diagnostics completed: Database is accessible.');
+    process.exit(0);
+  } else {
+    console.error('\n❌ Diagnostics completed: Database is NOT accessible.');
+    process.exit(1);
+  }
+})();

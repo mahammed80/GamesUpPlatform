@@ -58,6 +58,12 @@ if (envResult.error) {
   console.log('✅ Environment variables loaded successfully');
 }
 
+// FORCE IPv4 override for localhost
+if (process.env.DB_HOST === 'localhost') {
+  console.warn('⚠️  DB_HOST is "localhost", forcing "127.0.0.1" to prevent IPv6 ::1 connection issues.');
+  process.env.DB_HOST = '127.0.0.1';
+}
+
 const paytabs = require('./services/paytabs');
 const oto = require('./services/oto');
 const emailService = require('./services/email');
