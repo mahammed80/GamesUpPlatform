@@ -8,6 +8,22 @@ const path = require('path');
 const fs = require('fs');
 const multer = require('multer');
 
+// Helper to find public_html in parent directories
+const findPublicHtml = (startPath) => {
+  let currentPath = startPath;
+  // Check up to 4 levels up
+  for (let i = 0; i < 4; i++) {
+    const checkPath = path.join(currentPath, 'public_html');
+    if (fs.existsSync(checkPath)) {
+      return checkPath;
+    }
+    const parent = path.dirname(currentPath);
+    if (parent === currentPath) break; // Root reached
+    currentPath = parent;
+  }
+  return null;
+};
+
 // Logging Utility
 const logFile = path.join(__dirname, 'server_error.log');
 const logError = (context, error) => {
@@ -476,6 +492,74 @@ app.get('/fix-db-schema', async (req, res) => {
       message: error.message,
       code: error.code 
     });
+  }
+});
+
+// Sync Uploads Route (Fix 404s)
+app.get('/sync-uploads', (req, res) => {
+  try {
+    const publicHtmlPath = findPublicHtml(__dirname);
+    if (!publicHtmlPath) {
+      return res.status(404).json({ error: 'public_html not found' });
+    }
+    
+    const publicHtmlUploads = path.join(publicHtmlPath, 'uploads');
+    const serverUploads = path.join(__dirname, 'uploads');
+    
+    if (!fs.existsSync(serverUploads)) {
+      return res.status(404).json({ error: 'Source uploads directory empty' });
+    }
+
+    if (!fs.existsSync(publicHtmlUploads)) {
+      fs.mkdirSync(publicHtmlUploads, { recursive: true });
+    }
+
+    // Check if it's a symlink
+    try {
+        const stats = fs.lstatSync(publicHtmlUploads);
+        if (stats.isSymbolicLink()) {
+            return res.json({ message: 'public_html/uploads is already a symlink. No sync needed.' });
+        }
+    } catch (e) {}
+
+    const files = fs.readdirSync(serverUploads);
+    let copied = 0;
+    let errors = 0;
+
+    files.forEach(file => {
+      try {
+        const src = path.join(serverUploads, file);
+        const dest = path.join(publicHtmlUploads, file);
+        
+        // Skip if directory
+        if (fs.lstatSync(src).isDirectory()) return;
+
+        // Copy if dest doesn't exist or is different size
+        let shouldCopy = true;
+        if (fs.existsSync(dest)) {
+            const srcStat = fs.statSync(src);
+            const destStat = fs.statSync(dest);
+            if (srcStat.size === destStat.size) shouldCopy = false;
+        }
+
+        if (shouldCopy) {
+            fs.copyFileSync(src, dest);
+            copied++;
+        }
+      } catch (err) {
+        console.error(`Failed to copy ${file}:`, err);
+        errors++;
+      }
+    });
+
+    res.json({ 
+      success: true, 
+      message: `Sync completed. Copied ${copied} files. Errors: ${errors}`,
+      target: publicHtmlUploads
+    });
+  } catch (error) {
+    console.error('Sync error:', error);
+    res.status(500).json({ error: 'Sync failed', details: error.message });
   }
 });
 
