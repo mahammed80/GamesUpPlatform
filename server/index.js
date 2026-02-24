@@ -187,8 +187,15 @@ const upload = multer({
 // Database connection - support both local and production
 const isProduction = process.env.NODE_ENV === 'production' || process.env.DB_HOST !== 'localhost';
 
+// Force IPv4 if DB_HOST is localhost to avoid ::1 (IPv6) connection issues
+let dbHost = process.env.DB_HOST || 'localhost';
+if (dbHost === 'localhost') {
+  dbHost = '127.0.0.1';
+  console.log('🔄 Converted localhost to 127.0.0.1 to force IPv4');
+}
+
 const pool = mysql.createPool({
-  host: process.env.DB_HOST || 'localhost',
+  host: dbHost,
   user: process.env.DB_USER,
   password: process.env.DB_PASSWORD,
   database: process.env.DB_NAME,
@@ -215,7 +222,7 @@ const getOrdersTableColumns = async () => {
   try {
     const connection = await pool.getConnection();
     console.log('✅ Connected to MySQL Database!');
-    console.log(`📍 Host: ${process.env.DB_HOST || 'localhost'}`);
+    console.log(`📍 Host: ${dbHost}`);
     console.log(`👤 User: ${process.env.DB_USER || 'undefined'}`);
     console.log(`💾 Database: ${process.env.DB_NAME || 'undefined'}`);
     const [rows] = await connection.query('SELECT NOW() as now');
@@ -241,7 +248,7 @@ app.get('/test-db-connection', async (req, res) => {
       message: 'Connected to database successfully',
       env_source: envSource,
       config: {
-        host: process.env.DB_HOST || 'localhost',
+        host: dbHost,
         user: process.env.DB_USER,
         database: process.env.DB_NAME,
         port: process.env.DB_PORT || 3306
@@ -255,7 +262,7 @@ app.get('/test-db-connection', async (req, res) => {
       code: error.code,
       env_source: envSource,
       config: {
-        host: process.env.DB_HOST || 'localhost',
+        host: dbHost,
         user: process.env.DB_USER,
         database: process.env.DB_NAME,
         port: process.env.DB_PORT || 3306
