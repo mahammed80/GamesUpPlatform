@@ -92,6 +92,11 @@ export const authAPI = {
     console.log('Login successful');
     return data;
   },
+
+  changePassword: (currentPassword: string, newPassword: string) => fetchAPI('/auth/change-password', {
+    method: 'POST',
+    body: JSON.stringify({ currentPassword, newPassword }),
+  }),
 };
 
 // Products API

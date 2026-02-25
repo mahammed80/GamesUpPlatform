@@ -3,12 +3,47 @@ import { Card } from '../ui/card';
 import { Button } from '../ui/button';
 import { Save } from 'lucide-react';
 import { useStoreSettings } from '../../context/StoreSettingsContext';
-import { BASE_URL } from '../../utils/api';
+import { BASE_URL, authAPI } from '../../utils/api';
 
 export function Settings() {
   const { settings, updateSettings } = useStoreSettings();
   const [activeTab, setActiveTab] = useState('store');
   
+  // Local state for password change
+  const [passwordForm, setPasswordForm] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: ''
+  });
+  const [passwordStatus, setPasswordStatus] = useState<{ message: string; type: 'success' | 'error' | '' }>({ message: '', type: '' });
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
+
+  const handlePasswordChange = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPasswordStatus({ message: '', type: '' });
+    
+    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+      setPasswordStatus({ message: 'New passwords do not match', type: 'error' });
+      return;
+    }
+
+    if (passwordForm.newPassword.length < 6) {
+      setPasswordStatus({ message: 'Password must be at least 6 characters long', type: 'error' });
+      return;
+    }
+
+    setIsChangingPassword(true);
+    try {
+      await authAPI.changePassword(passwordForm.currentPassword, passwordForm.newPassword);
+      setPasswordStatus({ message: 'Password changed successfully', type: 'success' });
+      setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
+    } catch (error) {
+      setPasswordStatus({ message: 'Failed to change password. Please check your current password.', type: 'error' });
+    } finally {
+      setIsChangingPassword(false);
+    }
+  };
+
   // Local state for form forms
   const [formData, setFormData] = useState({
     currency_code: 'USD',
@@ -402,11 +437,23 @@ export function Settings() {
         <div className="space-y-6">
           <Card className="p-8">
             <h3 className="font-semibold text-gray-900 dark:text-white mb-4">Change Password</h3>
-            <div className="space-y-4">
+            <form onSubmit={handlePasswordChange} className="space-y-4">
+              {passwordStatus.message && (
+                <div className={`p-3 rounded-lg text-sm ${
+                  passwordStatus.type === 'success' 
+                    ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                    : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+                }`}>
+                  {passwordStatus.message}
+                </div>
+              )}
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Current Password</label>
                 <input
                   type="password"
+                  required
+                  value={passwordForm.currentPassword}
+                  onChange={(e) => setPasswordForm({ ...passwordForm, currentPassword: e.target.value })}
                   className="w-full px-4 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
@@ -414,6 +461,10 @@ export function Settings() {
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">New Password</label>
                 <input
                   type="password"
+                  required
+                  minLength={6}
+                  value={passwordForm.newPassword}
+                  onChange={(e) => setPasswordForm({ ...passwordForm, newPassword: e.target.value })}
                   className="w-full px-4 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
@@ -421,10 +472,19 @@ export function Settings() {
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Confirm New Password</label>
                 <input
                   type="password"
+                  required
+                  minLength={6}
+                  value={passwordForm.confirmPassword}
+                  onChange={(e) => setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })}
                   className="w-full px-4 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
-            </div>
+              <div className="flex justify-end pt-2">
+                <Button type="submit" disabled={isChangingPassword}>
+                  {isChangingPassword ? 'Updating...' : 'Update Password'}
+                </Button>
+              </div>
+            </form>
           </Card>
 
           <Card className="p-8">

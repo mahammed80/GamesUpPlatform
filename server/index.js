@@ -809,6 +809,47 @@ app.post(`${BASE_PATH}/auth/login`, async (req, res) => {
   }
 });
 
+// Change Password Route
+app.post(`${BASE_PATH}/auth/change-password`, async (req, res) => {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+  
+  if (!token) return res.status(401).json({ error: 'Access token required' });
+
+  try {
+    const user = jwt.verify(token, JWT_SECRET);
+    const { currentPassword, newPassword } = req.body;
+    
+    // Get user from DB to verify current password
+    // user.sub contains the user ID from the JWT payload
+    const [rows] = await pool.query('SELECT * FROM users WHERE id = ?', [user.sub]);
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    const dbUser = rows[0];
+    const match = await bcrypt.compare(currentPassword, dbUser.password_hash);
+    
+    if (!match) {
+      return res.status(401).json({ error: 'Incorrect current password' });
+    }
+    
+    const salt = await bcrypt.genSalt(10);
+    const newHash = await bcrypt.hash(newPassword, salt);
+    
+    await pool.query('UPDATE users SET password_hash = ? WHERE id = ?', [newHash, user.sub]);
+    
+    res.json({ message: 'Password updated successfully' });
+    
+  } catch (error) {
+    console.error('Change password error:', error);
+    if (error.name === 'JsonWebTokenError') {
+       return res.status(403).json({ error: 'Invalid token' });
+    }
+    res.status(500).json({ error: 'Failed to update password' });
+  }
+});
+
 // Setup Accounts (Missing Endpoint)
 app.post(`${BASE_PATH}/setup-accounts`, async (req, res) => {
   try {
