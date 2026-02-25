@@ -889,7 +889,8 @@ app.get(`${BASE_PATH}/settings`, async (req, res) => {
     res.json(settings);
   } catch (error) {
     console.error('Fetch settings error:', error);
-    res.status(500).json({ error: 'Failed to fetch settings', details: error.message });
+    logError('Fetch Settings', error);
+    res.status(500).json({ error: `Failed to fetch settings: ${error.message}`, details: error.message });
   }
 });
 
@@ -933,7 +934,8 @@ app.get(`${BASE_PATH}/notifications`, async (req, res) => {
     res.json(rows);
   } catch (error) {
     console.error('Fetch notifications error:', error);
-    res.status(500).json({ error: 'Failed to fetch notifications', details: error.message });
+    logError('Fetch Notifications', error);
+    res.status(500).json({ error: `Failed to fetch notifications: ${error.message}`, details: error.message });
   }
 });
 
