@@ -17,6 +17,7 @@ interface Product {
   rating?: number;
   reviews?: number;
   specs?: Record<string, string>;
+  digitalItems?: any[];
 }
 
 interface ProductDetailsProps {
@@ -33,6 +34,9 @@ export function ProductDetails({ onOpenCart, productId }: ProductDetailsProps) {
   const [quantity, setQuantity] = useState(1);
   const [isFavorite, setIsFavorite] = useState(false);
 
+  const [selectedAttribute, setSelectedAttribute] = useState<string | null>(null);
+  const [availableAttributes, setAvailableAttributes] = useState<Record<string, number>>({});
+
   useEffect(() => {
     if (productId) {
       loadProduct(productId);
@@ -45,6 +49,32 @@ export function ProductDetails({ onOpenCart, productId }: ProductDetailsProps) {
     if (product) {
       const favorites = JSON.parse(localStorage.getItem('favorites') || '[]');
       setIsFavorite(favorites.some((f: any) => f.id === product.id));
+
+      // Calculate available attributes from digital items slots
+      if (product.digitalItems && product.digitalItems.length > 0) {
+        const counts: Record<string, number> = {};
+        let hasSlots = false;
+
+        product.digitalItems.forEach((item: any) => {
+          if (item.slots) {
+            hasSlots = true;
+            Object.entries(item.slots).forEach(([attr, slot]: [string, any]) => {
+              if (!slot.sold) {
+                counts[attr] = (counts[attr] || 0) + 1;
+              }
+            });
+          }
+        });
+
+        if (hasSlots) {
+          setAvailableAttributes(counts);
+          // Auto-select first available if none selected
+          if (!selectedAttribute && Object.keys(counts).length > 0) {
+            // Optional: Auto-select or force user to select
+            // setSelectedAttribute(Object.keys(counts)[0]); 
+          }
+        }
+      }
     }
   }, [product]);
 
@@ -94,18 +124,33 @@ export function ProductDetails({ onOpenCart, productId }: ProductDetailsProps) {
   const addToCart = () => {
     if (!product) return;
     
+    // Validate attribute selection if required
+    const hasAttributes = Object.keys(availableAttributes).length > 0;
+    if (hasAttributes && !selectedAttribute) {
+      alert('Please select a version (Primary/Secondary/etc) before adding to cart');
+      return;
+    }
+
     const cart = JSON.parse(localStorage.getItem('cart') || '[]');
-    const existingItemIndex = cart.findIndex((ci: any) => ci.id === product.id);
+    // Create a unique ID for cart item based on product ID AND selected attribute
+    const cartItemId = hasAttributes && selectedAttribute 
+      ? `${product.id}-${selectedAttribute}` 
+      : product.id;
+
+    const existingItemIndex = cart.findIndex((ci: any) => ci.cartItemId === cartItemId || (ci.id === product.id && ci.attribute === selectedAttribute));
     
     if (existingItemIndex >= 0) {
       cart[existingItemIndex].quantity += quantity;
     } else {
       cart.push({
         id: product.id,
+        cartItemId: cartItemId, // Unique identifier for cart management
         name: product.name,
         price: product.price,
         image: product.image,
         quantity: quantity,
+        attribute: selectedAttribute, // For backend processing
+        attributes: selectedAttribute ? { "Version": selectedAttribute } : {}, // For display
       });
     }
     
@@ -245,6 +290,34 @@ export function ProductDetails({ onOpenCart, productId }: ProductDetailsProps) {
                 >
                   {product.description}
                 </motion.p>
+
+                {/* Attribute Selection */}
+                {Object.keys(availableAttributes).length > 0 && (
+                  <div className="mb-8">
+                    <h3 className="text-sm font-medium text-gray-900 mb-3">Select Version</h3>
+                    <div className="flex flex-wrap gap-3">
+                      {Object.entries(availableAttributes).map(([attr, count]) => (
+                        <button
+                          key={attr}
+                          onClick={() => setSelectedAttribute(attr)}
+                          disabled={count === 0}
+                          className={`px-4 py-2 rounded-lg border text-sm font-medium transition-all ${
+                            selectedAttribute === attr
+                              ? 'border-red-600 bg-red-50 text-red-600 ring-1 ring-red-600'
+                              : count === 0
+                              ? 'border-gray-200 bg-gray-50 text-gray-400 cursor-not-allowed'
+                              : 'border-gray-200 text-gray-700 hover:border-gray-300'
+                          }`}
+                        >
+                          {attr}
+                          <span className="ml-2 text-xs opacity-75">
+                            ({count} left)
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 {/* Specs */}
                 <div className="grid grid-cols-2 gap-4 mb-8">

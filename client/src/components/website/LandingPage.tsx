@@ -15,6 +15,7 @@ interface Product {
   price: number;
   image: string;
   categorySlug?: string;
+  hasVariants?: boolean;
 }
 
 interface Category {
@@ -85,6 +86,10 @@ export function LandingPage({ onNavigate, onOpenCart }: LandingPageProps) {
   }, []);
 
   const addToCart = (product: Product | any) => {
+    if (product.hasVariants) {
+      onNavigate('product', product.id);
+      return;
+    }
     const cart = JSON.parse(localStorage.getItem('cart') || '[]');
     cart.push({
       id: product.id || `temp-${Date.now()}`,

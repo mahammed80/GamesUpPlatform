@@ -25,6 +25,13 @@ interface Product {
     email?: string;
     password?: string;
     code?: string;
+    outlookEmail?: string;
+    outlookPassword?: string;
+    birthdate?: string;
+    region?: string;
+    onlineId?: string;
+    backupCodes?: string;
+    slots?: Record<string, { sold: boolean; orderId: string | null }>;
   }[];
 }
 
@@ -167,11 +174,21 @@ export function Products() {
     stock: 0,
     image: '',
     attributes: {} as Record<string, any>,
-    digitalItems: [] as { email?: string; password?: string; code?: string }[],
+    digitalItems: [] as Product['digitalItems'],
   });
 
   // Temp state for adding new digital item
-  const [newItem, setNewItem] = useState({ email: '', password: '', code: '' });
+  const [newItem, setNewItem] = useState({ 
+    email: '', 
+    password: '', 
+    code: '', 
+    outlookEmail: '', 
+    outlookPassword: '', 
+    birthdate: '', 
+    region: '', 
+    onlineId: '', 
+    backupCodes: '' 
+  });
 
   useEffect(() => {
     loadData();
@@ -272,30 +289,42 @@ export function Products() {
   const handleAddDigitalItem = () => {
     if (!newItem.email && !newItem.password && !newItem.code) return;
     
+    const slots = {
+        'Ps4 Primary': { sold: false, orderId: null },
+        'Ps5 Primary': { sold: false, orderId: null },
+        'Secondary': { sold: false, orderId: null },
+        'Ps4 Offline': { sold: false, orderId: null },
+        'Ps5 Offline': { sold: false, orderId: null }
+    };
+
     setFormData(prev => ({
       ...prev,
-      digitalItems: [...prev.digitalItems, newItem],
-      stock: prev.stock + 1 // Auto-increment stock
+      digitalItems: [...(prev.digitalItems || []), { ...newItem, slots }],
+      stock: prev.stock + 5 // Each account provides 5 slots
     }));
-    setNewItem({ email: '', password: '', code: '' });
+    setNewItem({ email: '', password: '', code: '', outlookEmail: '', outlookPassword: '', birthdate: '', region: '', onlineId: '', backupCodes: '' });
   };
 
   const handleRemoveDigitalItem = (index: number) => {
-    setFormData(prev => ({
-      ...prev,
-      digitalItems: prev.digitalItems.filter((_, i) => i !== index),
-      stock: Math.max(0, prev.stock - 1) // Auto-decrement stock
-    }));
+    setFormData(prev => {
+        const item = prev.digitalItems?.[index];
+        const slotsCount = item?.slots ? 5 : 1;
+        return {
+            ...prev,
+            digitalItems: (prev.digitalItems || []).filter((_, i) => i !== index),
+            stock: Math.max(0, prev.stock - slotsCount)
+        };
+    });
   };
 
   const handleExportCSVTemplate = () => {
-    const headers = ['Email,Password,Code'];
+    const headers = ['Email,Password,Code,OutlookEmail,OutlookPassword,Birthdate,Region,OnlineID,BackupCodes'];
     const csvContent = headers.join('\n');
     const blob = new Blob([csvContent], { type: 'text/csv' });
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'digital_products_template.csv';
+    a.download = 'digital_stock_template.csv';
     a.click();
     window.URL.revokeObjectURL(url);
   };
@@ -308,23 +337,48 @@ export function Products() {
     reader.onload = (event) => {
       const text = event.target?.result as string;
       const lines = text.split('\n');
-      const newItems: { email?: string; password?: string; code?: string }[] = [];
+      const newItems: Product['digitalItems'] = [];
 
       // Skip header (index 0)
       for (let i = 1; i < lines.length; i++) {
         const line = lines[i].trim();
         if (!line) continue;
         
-        const [email, password, code] = line.split(',').map(item => item.trim());
+        // CSV Format: Email,Password,Code,OutlookEmail,OutlookPassword,Birthdate,Region,OnlineID,BackupCodes
+        const parts = line.split(',').map(item => item.trim());
+        const [email, password, code, outlookEmail, outlookPassword, birthdate, region, onlineId, ...rest] = parts;
+        
+        // Backup codes might contain commas if quoted, but for simplicity assume simple CSV or last field captures rest
+        // If backup codes are newline separated inside a cell, standard CSV split might break.
+        // But let's assume simple comma separation for now as per "12 rows of code column" -> likely a text block.
+        const backupCodes = rest.join(','); // Join remaining parts as backup codes if any
+
         if (email || password || code) {
-          newItems.push({ email, password, code });
+          newItems.push({
+            email, 
+            password, 
+            code,
+            outlookEmail,
+            outlookPassword,
+            birthdate,
+            region,
+            onlineId,
+            backupCodes,
+            slots: {
+                'Ps4 Primary': { sold: false, orderId: null },
+                'Ps5 Primary': { sold: false, orderId: null },
+                'Secondary': { sold: false, orderId: null },
+                'Ps4 Offline': { sold: false, orderId: null },
+                'Ps5 Offline': { sold: false, orderId: null }
+            }
+          });
         }
       }
 
       setFormData(prev => ({
         ...prev,
-        digitalItems: [...prev.digitalItems, ...newItems],
-        stock: prev.stock + newItems.length
+        digitalItems: [...(prev.digitalItems || []), ...newItems],
+        stock: prev.stock + (newItems.length * 5)
       }));
     };
     reader.readAsText(file);
@@ -749,7 +803,7 @@ export function Products() {
             
             {/* Add New Item Form */}
             <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg mb-4">
-              <div className="grid grid-cols-3 gap-3 mb-3">
+              <div className="grid grid-cols-2 gap-3 mb-3">
                 <input
                   type="email"
                   value={newItem.email}
@@ -764,12 +818,54 @@ export function Products() {
                   className="w-full px-3 py-2 text-sm bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
                   placeholder="Password"
                 />
-                <input
-                  type="text"
+                <textarea
                   value={newItem.code}
                   onChange={(e) => setNewItem({ ...newItem, code: e.target.value })}
+                  className="col-span-2 w-full px-3 py-2 text-sm bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 font-mono"
+                  placeholder="Code/Key (12 rows supported)"
+                  rows={3}
+                />
+                <input
+                  type="email"
+                  value={newItem.outlookEmail}
+                  onChange={(e) => setNewItem({ ...newItem, outlookEmail: e.target.value })}
                   className="w-full px-3 py-2 text-sm bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
-                  placeholder="Code/Key"
+                  placeholder="Outlook Email"
+                />
+                <input
+                  type="text"
+                  value={newItem.outlookPassword}
+                  onChange={(e) => setNewItem({ ...newItem, outlookPassword: e.target.value })}
+                  className="w-full px-3 py-2 text-sm bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
+                  placeholder="Outlook Password"
+                />
+                <input
+                  type="text"
+                  value={newItem.birthdate}
+                  onChange={(e) => setNewItem({ ...newItem, birthdate: e.target.value })}
+                  className="w-full px-3 py-2 text-sm bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
+                  placeholder="Birthdate"
+                />
+                <input
+                  type="text"
+                  value={newItem.region}
+                  onChange={(e) => setNewItem({ ...newItem, region: e.target.value })}
+                  className="w-full px-3 py-2 text-sm bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
+                  placeholder="Region"
+                />
+                <input
+                  type="text"
+                  value={newItem.onlineId}
+                  onChange={(e) => setNewItem({ ...newItem, onlineId: e.target.value })}
+                  className="w-full px-3 py-2 text-sm bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
+                  placeholder="Online ID"
+                />
+                <input
+                  type="text"
+                  value={newItem.backupCodes}
+                  onChange={(e) => setNewItem({ ...newItem, backupCodes: e.target.value })}
+                  className="w-full px-3 py-2 text-sm bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
+                  placeholder="Backup Codes"
                 />
               </div>
               <Button onClick={handleAddDigitalItem} className="w-full text-sm py-1" disabled={!newItem.email && !newItem.password && !newItem.code}>
@@ -783,18 +879,28 @@ export function Products() {
                 <table className="w-full text-sm">
                   <thead className="bg-gray-50 dark:bg-gray-900 sticky top-0">
                     <tr>
-                      <th className="text-left py-2 px-3 font-medium text-gray-500 dark:text-gray-400">Email</th>
-                      <th className="text-left py-2 px-3 font-medium text-gray-500 dark:text-gray-400">Password</th>
-                      <th className="text-left py-2 px-3 font-medium text-gray-500 dark:text-gray-400">Code</th>
+                      <th className="text-left py-2 px-3 font-medium text-gray-500 dark:text-gray-400">Main Info</th>
+                      <th className="text-left py-2 px-3 font-medium text-gray-500 dark:text-gray-400">Outlook</th>
+                      <th className="text-left py-2 px-3 font-medium text-gray-500 dark:text-gray-400">Details</th>
                       <th className="w-10"></th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
                     {formData.digitalItems.map((item, index) => (
                       <tr key={index} className="bg-white dark:bg-gray-800">
-                        <td className="py-2 px-3 text-gray-900 dark:text-gray-300 truncate max-w-[100px]">{item.email}</td>
-                        <td className="py-2 px-3 text-gray-900 dark:text-gray-300 truncate max-w-[100px]">{item.password}</td>
-                        <td className="py-2 px-3 font-mono text-gray-600 dark:text-gray-400 truncate max-w-[100px]">{item.code}</td>
+                        <td className="py-2 px-3 text-gray-900 dark:text-gray-300">
+                          <div className="font-medium truncate max-w-[120px]">{item.email}</div>
+                          <div className="text-xs text-gray-500 truncate max-w-[120px]">{item.password}</div>
+                          {item.code && <div className="text-xs font-mono text-gray-400 truncate max-w-[120px]">{item.code}</div>}
+                        </td>
+                        <td className="py-2 px-3 text-gray-900 dark:text-gray-300">
+                           <div className="text-xs truncate max-w-[100px]">{item.outlookEmail}</div>
+                           <div className="text-xs text-gray-500 truncate max-w-[100px]">{item.outlookPassword}</div>
+                        </td>
+                        <td className="py-2 px-3 text-gray-900 dark:text-gray-300">
+                            <div className="text-xs">ID: {item.onlineId}</div>
+                            <div className="text-xs text-gray-500">{item.region}</div>
+                        </td>
                         <td className="py-2 px-3 text-right">
                           <button
                             onClick={() => handleRemoveDigitalItem(index)}

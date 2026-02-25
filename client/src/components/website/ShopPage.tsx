@@ -28,6 +28,7 @@ interface Product {
   subcategorySlug?: string;
   stock: number;
   rating?: number;
+  hasVariants?: boolean;
 }
 
 export function ShopPage({ onNavigate, onOpenCart }: ShopPageProps) {
@@ -96,6 +97,12 @@ export function ShopPage({ onNavigate, onOpenCart }: ShopPageProps) {
   );
 
   const addToCart = (product: Product) => {
+    // If product has variants (like Ps4/Ps5), redirect to details page
+    if (product.hasVariants) {
+      onNavigate('product', product.id);
+      return;
+    }
+
     const cart = JSON.parse(localStorage.getItem('cart') || '[]');
     cart.push({
       id: product.id,

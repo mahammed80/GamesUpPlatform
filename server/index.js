@@ -933,7 +933,7 @@ app.get(`${BASE_PATH}/notifications`, async (req, res) => {
     res.json(rows);
   } catch (error) {
     console.error('Fetch notifications error:', error);
-    res.status(500).json({ error: 'Failed to fetch notifications' });
+    res.status(500).json({ error: 'Failed to fetch notifications', details: error.message });
   }
 });
 
@@ -1092,10 +1092,60 @@ app.post(`${BASE_PATH}/customer-orders`, async (req, res) => {
 
       for (let i = 0; i < quantity; i++) {
         let assignedKey = null;
-        
+        let selectedAttribute = item.attribute || item.selectedAttribute || item.variation;
+
         if (assignNow && digitalItems.length > 0) {
-          assignedKey = digitalItems.shift();
+           // Check if product uses slots (new schema)
+           const hasSlots = digitalItems.some(di => di.slots);
+
+           if (hasSlots) {
+               // If no attribute provided, try to find first available one (fallback)
+               if (!selectedAttribute) {
+                   for (const di of digitalItems) {
+                       if (di.slots) {
+                           for (const [attr, slot] of Object.entries(di.slots)) {
+                               if (!slot.sold) {
+                                   selectedAttribute = attr;
+                                   break;
+                               }
+                           }
+                       }
+                       if (selectedAttribute) break;
+                   }
+               }
+
+               if (selectedAttribute) {
+                   // Find item with specific slot available
+                   const foundIndex = digitalItems.findIndex(di => 
+                       di.slots && di.slots[selectedAttribute] && !di.slots[selectedAttribute].sold
+                   );
+
+                   if (foundIndex !== -1) {
+                       const di = digitalItems[foundIndex];
+                       // Mark as sold
+                       di.slots[selectedAttribute].sold = true;
+                       di.slots[selectedAttribute].orderId = orderNumber;
+
+                       assignedKey = {
+                           email: di.email,
+                           password: di.password,
+                           code: di.code,
+                           outlookEmail: di.outlookEmail,
+                           outlookPassword: di.outlookPassword,
+                           birthdate: di.birthdate,
+                           region: di.region,
+                           onlineId: di.onlineId,
+                           backupCodes: di.backupCodes,
+                           attribute: selectedAttribute
+                       };
+                   }
+               }
+           } else {
+               // Legacy: simple array of items
+               assignedKey = digitalItems.shift();
+           }
         }
+
         if (assignNow && assignedKey) {
           digitalKeys.push({
             productName: product.name,
@@ -1117,13 +1167,18 @@ app.post(`${BASE_PATH}/customer-orders`, async (req, res) => {
         addCol('order_number', orderNumber);
         addCol('customer_name', customerName);
         addCol('customer_email', customerEmail);
-        addCol('product_name', product.name);
+        addCol('product_name', product.name + (selectedAttribute ? ` (${selectedAttribute})` : ''));
         addCol('date', orderDate);
         addCol('status', initialStatus);
         addCol('amount', product.price);
         addCol('digital_email', assignNow && assignedKey ? assignedKey.email : null);
         addCol('digital_password', assignNow && assignedKey ? assignedKey.password : null);
         addCol('digital_code', assignNow && assignedKey ? assignedKey.code : null);
+        
+        // Store attribute in digital_delivery even if key not assigned, for later retry
+        const deliveryInfo = assignedKey ? assignedKey : (selectedAttribute ? { attribute: selectedAttribute } : null);
+        addCol('digital_delivery', deliveryInfo ? JSON.stringify(deliveryInfo) : null);
+        
         addCol('inventory_id', isPOS ? 'POS' : null);
         addCol('payment_method', paymentMethod || null);
         addCol('payment_proof', paymentProof || null);
@@ -1146,7 +1201,24 @@ app.post(`${BASE_PATH}/customer-orders`, async (req, res) => {
         // If it was digital (had keys initially) or still has keys, sync stock to keys.
         // Otherwise treat as physical.
         const isDigital = initialDigitalCount > 0 || digitalItems.length > 0;
-        const newStock = isDigital ? digitalItems.length : Math.max(0, product.stock - quantity);
+        let newStock = 0;
+        
+        if (isDigital) {
+            // Check if using slots
+            if (digitalItems.some(di => di.slots)) {
+                // Count unsold slots
+                newStock = digitalItems.reduce((acc, di) => {
+                    if (di.slots) {
+                        return acc + Object.values(di.slots).filter(s => !s.sold).length;
+                    }
+                    return acc;
+                }, 0);
+            } else {
+                newStock = digitalItems.length;
+            }
+        } else {
+            newStock = Math.max(0, product.stock - quantity);
+        }
 
         await connection.query(
           'UPDATE products SET digital_items = ?, stock = ? WHERE id = ?',
@@ -1166,12 +1238,21 @@ app.post(`${BASE_PATH}/customer-orders`, async (req, res) => {
                 
                 let keysHtml = '';
                 digitalKeys.forEach(key => {
+                    const extraFields = [];
+                    if (key.outlookEmail) extraFields.push(`<p><strong>Outlook Email:</strong> ${key.outlookEmail}</p>`);
+                    if (key.outlookPassword) extraFields.push(`<p><strong>Outlook Password:</strong> ${key.outlookPassword}</p>`);
+                    if (key.birthdate) extraFields.push(`<p><strong>Birthdate:</strong> ${key.birthdate}</p>`);
+                    if (key.region) extraFields.push(`<p><strong>Region:</strong> ${key.region}</p>`);
+                    if (key.onlineId) extraFields.push(`<p><strong>Online ID:</strong> ${key.onlineId}</p>`);
+                    if (key.backupCodes) extraFields.push(`<p><strong>Backup Codes:</strong> <br/><pre style="background: #eee; padding: 5px; white-space: pre-wrap;">${key.backupCodes}</pre></p>`);
+
                     keysHtml += `
                     <div style="background-color: #f4f4f4; padding: 15px; border-radius: 5px; margin-bottom: 10px;">
-                        <h4 style="margin-top: 0;">${key.productName}</h4>
+                        <h4 style="margin-top: 0;">${key.productName} ${key.attribute ? `(${key.attribute})` : ''}</h4>
                         <p><strong>Email:</strong> ${key.email || 'N/A'}</p>
                         <p><strong>Password:</strong> ${key.password || 'N/A'}</p>
                         <p><strong>Code:</strong> <span style="font-family: monospace; background: #eee; padding: 2px 5px;">${key.code || 'N/A'}</span></p>
+                        ${extraFields.join('')}
                         <p><span style="background-color: #e0f2fe; color: #0369a1; padding: 2px 6px; border-radius: 4px; font-size: 0.8em;">${isPOS ? 'POS Order' : 'Online Order'}</span></p>
                     </div>`;
                 });
@@ -1395,7 +1476,7 @@ app.post(`${BASE_PATH}/payment/verify`, async (req, res) => {
       const keysAssigned = [];
       for (const row of orderRows) {
         if (!row.digital_email && !row.digital_password && !row.digital_code) {
-          const [productRows] = await pool.query('SELECT * FROM products WHERE name = ? FOR UPDATE', [row.product_name]);
+          const [productRows] = await pool.query('SELECT * FROM products WHERE name = ? FOR UPDATE', [row.product_name.split(' (')[0]]); // Remove attribute from name if present
           if (productRows.length === 0) continue;
           const product = productRows[0];
           let digitalItems = [];
@@ -1405,20 +1486,88 @@ app.post(`${BASE_PATH}/payment/verify`, async (req, res) => {
             digitalItems = [];
           }
           if (digitalItems.length === 0) continue;
-          const assignedKey = digitalItems.shift();
-          // Sync stock with remaining digital items count
-          const newStock = digitalItems.length;
-          await pool.query('UPDATE products SET digital_items = ?, stock = ? WHERE id = ?', [JSON.stringify(digitalItems), newStock, product.id]);
-          await pool.query('UPDATE orders SET digital_email = ?, digital_password = ?, digital_code = ?, status = ? WHERE id = ?', [assignedKey.email || null, assignedKey.password || null, assignedKey.code || null, 'completed', row.id]);
-          keysAssigned.push({ productName: row.product_name, ...assignedKey });
+
+          // Determine attribute from stored digital_delivery or product name
+          let requestedAttribute = null;
+          try {
+             const deliveryInfo = row.digital_delivery ? JSON.parse(row.digital_delivery) : {};
+             requestedAttribute = deliveryInfo.attribute;
+          } catch(e) {}
+          
+          if (!requestedAttribute) {
+             // Try to extract from product name "Name (Attribute)"
+             const match = row.product_name.match(/\(([^)]+)\)$/);
+             if (match) requestedAttribute = match[1];
+          }
+
+          let assignedKey = null;
+          
+          // Slot-based allocation logic (Copied from customer-orders)
+          const hasSlots = digitalItems.some(di => di.slots);
+          if (hasSlots) {
+             if (requestedAttribute) {
+                 const foundIndex = digitalItems.findIndex(di => 
+                     di.slots && di.slots[requestedAttribute] && !di.slots[requestedAttribute].sold
+                 );
+                 if (foundIndex !== -1) {
+                     const di = digitalItems[foundIndex];
+                     di.slots[requestedAttribute].sold = true;
+                     di.slots[requestedAttribute].orderId = orderNumber;
+                     assignedKey = {
+                         email: di.email,
+                         password: di.password,
+                         code: di.code,
+                         outlookEmail: di.outlookEmail,
+                         outlookPassword: di.outlookPassword,
+                         birthdate: di.birthdate,
+                         region: di.region,
+                         onlineId: di.onlineId,
+                         backupCodes: di.backupCodes,
+                         attribute: requestedAttribute
+                     };
+                 }
+             }
+          } else {
+             assignedKey = digitalItems.shift();
+          }
+
+          if (assignedKey) {
+              // Update Stock
+              let newStock = 0;
+              if (hasSlots) {
+                  newStock = digitalItems.reduce((acc, di) => {
+                      if (di.slots) {
+                          return acc + Object.values(di.slots).filter(s => !s.sold).length;
+                      }
+                      return acc;
+                  }, 0);
+              } else {
+                  newStock = digitalItems.length;
+              }
+
+              await pool.query('UPDATE products SET digital_items = ?, stock = ? WHERE id = ?', [JSON.stringify(digitalItems), newStock, product.id]);
+              
+              await pool.query('UPDATE orders SET digital_email = ?, digital_password = ?, digital_code = ?, digital_delivery = ?, status = ? WHERE id = ?', 
+                  [assignedKey.email || null, assignedKey.password || null, assignedKey.code || null, JSON.stringify(assignedKey), 'completed', row.id]);
+              
+              keysAssigned.push({ productName: row.product_name, ...assignedKey });
+          }
         } else {
           // Keys already assigned (reserved during pending)
           await pool.query('UPDATE orders SET status = ? WHERE id = ?', ['completed', row.id]);
+          
+          // Parse extra fields from digital_delivery if available
+          let extraFields = {};
+          try {
+             extraFields = row.digital_delivery ? JSON.parse(row.digital_delivery) : {};
+          } catch(e) {}
+
           keysAssigned.push({ 
              productName: row.product_name, 
              email: row.digital_email, 
              password: row.digital_password, 
-             code: row.digital_code 
+             code: row.digital_code,
+             ...extraFields
           });
         }
       }
@@ -1428,12 +1577,21 @@ app.post(`${BASE_PATH}/payment/verify`, async (req, res) => {
         const emailSubject = `Your Order #${orderNumber} is Completed`;
         let keysHtml = '';
         keysAssigned.forEach(key => {
+          const extraFields = [];
+          if (key.outlookEmail) extraFields.push(`<p><strong>Outlook Email:</strong> ${key.outlookEmail}</p>`);
+          if (key.outlookPassword) extraFields.push(`<p><strong>Outlook Password:</strong> ${key.outlookPassword}</p>`);
+          if (key.birthdate) extraFields.push(`<p><strong>Birthdate:</strong> ${key.birthdate}</p>`);
+          if (key.region) extraFields.push(`<p><strong>Region:</strong> ${key.region}</p>`);
+          if (key.onlineId) extraFields.push(`<p><strong>Online ID:</strong> ${key.onlineId}</p>`);
+          if (key.backupCodes) extraFields.push(`<p><strong>Backup Codes:</strong> <br/><pre style="background: #eee; padding: 5px; white-space: pre-wrap;">${key.backupCodes}</pre></p>`);
+
           keysHtml += `
             <div style="background-color: #f4f4f4; padding: 15px; border-radius: 5px; margin-bottom: 10px;">
-              <h4 style="margin-top: 0;">${key.productName}</h4>
+              <h4 style="margin-top: 0;">${key.productName} ${key.attribute ? `(${key.attribute})` : ''}</h4>
               <p><strong>Email:</strong> ${key.email || 'N/A'}</p>
               <p><strong>Password:</strong> ${key.password || 'N/A'}</p>
               <p><strong>Code:</strong> <span style="font-family: monospace; background: #eee; padding: 2px 5px;">${key.code || 'N/A'}</span></p>
+              ${extraFields.join('')}
             </div>`;
         });
         const emailHtml = `
@@ -1521,7 +1679,7 @@ app.get(`${BASE_PATH}/products`, async (req, res) => {
     res.json({ products });
   } catch (error) {
     console.error('Error fetching products:', error);
-    res.status(500).json({ error: 'Failed to fetch products' });
+    res.status(500).json({ error: 'Failed to fetch products', details: error.message });
   }
 });
 
@@ -1669,7 +1827,7 @@ app.get(`${BASE_PATH}/orders`, async (req, res) => {
     res.json({ orders });
   } catch (error) {
     console.error('Error fetching orders:', error);
-    res.status(500).json({ error: 'Failed to fetch orders' });
+    res.status(500).json({ error: 'Failed to fetch orders', details: error.message });
   }
 });
 
@@ -2003,7 +2161,7 @@ app.get(`${BASE_PATH}/system/categories`, async (req, res) => {
     res.json(categories);
   } catch (error) {
     console.error('Error fetching categories:', error);
-    res.status(500).json({ error: 'Failed to fetch categories' });
+    res.status(500).json({ error: 'Failed to fetch categories', details: error.message });
   }
 });
 
@@ -2303,6 +2461,18 @@ app.get(`${BASE_PATH}/public/products`, async (req, res) => {
         attributes = {};
       }
 
+      let hasVariants = false;
+      try {
+        const digitalItems = typeof product.digital_items === 'string'
+          ? JSON.parse(product.digital_items)
+          : (product.digital_items || []);
+        
+        // Check if any digital item has slots (new schema)
+        hasVariants = digitalItems.some(item => item.slots && Object.keys(item.slots).length > 0);
+      } catch (e) {
+        hasVariants = false;
+      }
+
       return {
         id: product.id,
         name: product.name,
@@ -2311,14 +2481,15 @@ app.get(`${BASE_PATH}/public/products`, async (req, res) => {
         stock: product.stock,
         image: product.image,
         categorySlug: product.category_slug || 'games',
-        attributes
+        attributes,
+        hasVariants
       };
     });
 
     res.json({ products });
   } catch (error) {
     console.error('Error fetching public products:', error);
-    res.status(500).json({ error: 'Failed to fetch products' });
+    res.status(500).json({ error: 'Failed to fetch products', details: error.message });
   }
 });
 
@@ -2603,163 +2774,8 @@ app.delete(`${BASE_PATH}/admin/users/:id`, async (req, res) => {
 // Settings routes are defined earlier in the file (around line 478)
 // Removed duplicate implementation to prevent conflicts
 
-// Create Customer Order
-app.post(`${BASE_PATH}/customer-orders`, async (req, res) => {
-  const connection = await pool.getConnection();
-  try {
-    await connection.beginTransaction();
+// Removed duplicate customer-orders POST handler that was conflicting with the main implementation
 
-    const { customerEmail, customerName, items, total, deliveryMethod, shippingAddress, paymentMethod, paymentProof } = req.body;
-    const orderNumber = `ORD-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
-    const purchasedItems = [];
-
-    // Determine initial status based on payment method
-    let status = 'pending';
-    if (['instapay', 'vodafone_cash', 'telda'].includes(paymentMethod)) {
-      status = 'pending_approval';
-    } else if (paymentMethod === 'cod') {
-      status = 'pending';
-    }
-
-    for (const item of items) {
-      // Handle quantity
-      for (let i = 0; i < item.quantity; i++) {
-        // Fetch fresh product data to ensure concurrency safety (simplistic locking via update later)
-        const [products] = await connection.query('SELECT * FROM products WHERE id = ? FOR UPDATE', [item.id]);
-
-        if (products.length === 0) {
-          throw new Error(`Product ${item.name} not found`);
-        }
-
-        const product = products[0];
-        let digitalItems = [];
-        try {
-          digitalItems = typeof product.digital_items === 'string'
-            ? JSON.parse(product.digital_items)
-            : (product.digital_items || []);
-        } catch (e) {
-          digitalItems = [];
-        }
-
-        // Check stock
-        if (digitalItems.length === 0) {
-          // If no digital items, we might just record the order without code (or fail?)
-          // For now, let's assume we proceed but mark as "Pending Delivery" or similar if no code
-          // But user specifically asked for code. Let's try to get one.
-          // If stock is 0, fail.
-          if (product.stock <= 0) {
-            throw new Error(`Product ${item.name} is out of stock`);
-          }
-        }
-
-        // Pop a digital item
-        const assignedItem = digitalItems.length > 0 ? digitalItems.shift() : null;
-
-        // Update product
-        const newStock = Math.max(0, product.stock - 1);
-
-        await connection.query(
-          'UPDATE products SET stock = ?, digital_items = ? WHERE id = ?',
-          [newStock, JSON.stringify(digitalItems), product.id]
-        );
-
-        // Insert into orders
-        await connection.query(
-          `INSERT INTO orders (
-            order_number, customer_name, customer_email, product_name, 
-            amount, cost, status, date,
-            digital_email, digital_password, digital_code,
-            payment_method, payment_proof
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), ?, ?, ?, ?, ?)`,
-          [
-            orderNumber,
-            customerName,
-            customerEmail,
-            product.name,
-            item.price,
-            product.cost || 0,
-            status,
-            assignedItem?.email || null,
-            assignedItem?.password || null,
-            assignedItem?.code || null,
-            paymentMethod || 'credit_card',
-            paymentProof || null
-          ]
-        );
-
-        purchasedItems.push({
-          name: product.name,
-          image: product.image,
-          price: item.price,
-          digitalItem: assignedItem
-        });
-      }
-    }
-
-    await connection.commit();
-
-    // Send email to customer
-    try {
-        const emailSubject = `Order Confirmation #${orderNumber}`;
-        const emailText = `Thank you for your order, ${customerName}! Your order #${orderNumber} has been placed successfully.`;
-        
-        let itemsHtml = purchasedItems.map(item => `
-            <div style="border: 1px solid #eee; padding: 15px; margin-bottom: 10px; border-radius: 5px;">
-                <h3 style="margin: 0 0 10px 0;">${item.name}</h3>
-                <p style="margin: 0;">Price: ${item.price}</p>
-                ${item.digitalItem ? `
-                    <div style="margin-top: 10px; background: #f9f9f9; padding: 10px; border-radius: 4px;">
-                        ${item.digitalItem.code ? `<p><strong>Code:</strong> ${item.digitalItem.code}</p>` : ''}
-                        ${item.digitalItem.email ? `<p><strong>Email:</strong> ${item.digitalItem.email}</p>` : ''}
-                        ${item.digitalItem.password ? `<p><strong>Password:</strong> ${item.digitalItem.password}</p>` : ''}
-                    </div>
-                ` : ''}
-            </div>
-        `).join('');
-
-        const emailHtml = `
-            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-                <h1 style="color: #333;">Order Confirmation</h1>
-                <p>Hello ${customerName},</p>
-                <p>Thank you for your purchase. Here are your order details:</p>
-                
-                <div style="background: #f5f5f5; padding: 15px; border-radius: 5px; margin: 20px 0;">
-                    <p><strong>Order Number:</strong> ${orderNumber}</p>
-                    <p><strong>Date:</strong> ${new Date().toLocaleString()}</p>
-                    <p><strong>Total:</strong> ${total}</p>
-                </div>
-
-                <h2>Your Items</h2>
-                ${itemsHtml}
-
-                <div style="margin-top: 30px; border-top: 1px solid #eee; padding-top: 20px;">
-                    <p>If you have any questions, please contact our support team.</p>
-                </div>
-            </div>
-        `;
-
-        emailService.sendEmail(customerEmail, emailSubject, emailText, emailHtml).catch(err => {
-            console.error('Failed to send order confirmation email:', err);
-        });
-
-    } catch (emailError) {
-        console.error('Error preparing email:', emailError);
-    }
-
-    res.json({
-      message: 'Order placed successfully',
-      orderNumber,
-      purchasedItems
-    });
-
-  } catch (error) {
-    await connection.rollback();
-    console.error('Error creating order:', error);
-    res.status(500).json({ error: error.message || 'Failed to create order' });
-  } finally {
-    connection.release();
-  }
-});
 
 // Get Customers (Admin)
 app.get(`${BASE_PATH}/admin/customers`, async (req, res) => {
@@ -2833,7 +2849,7 @@ app.get(`${BASE_PATH}/admin/sold-products`, async (req, res) => {
     res.json(soldProducts);
   } catch (error) {
     console.error('Error fetching sold products:', error);
-    res.status(500).json({ error: 'Failed to fetch sold products' });
+    res.status(500).json({ error: 'Failed to fetch sold products', details: error.message });
   }
 });
 
@@ -3249,3 +3265,12 @@ runMigrations().then(() => {
     process.exit(1);
   });
 });
+
+process.on('uncaughtException', (error) => {
+  console.error('Uncaught Exception:', error);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+});
+

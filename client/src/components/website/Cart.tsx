@@ -5,11 +5,14 @@ import { productsAPI } from '../../utils/api';
 
 interface CartItem {
   id: string;
+  cartItemId?: string; // Added for unique identification of variants
   name: string;
   price: number;
   quantity: number;
   image: string;
   category?: string;
+  attribute?: string;
+  attributes?: Record<string, any>;
 }
 
 interface CartProps {
@@ -55,17 +58,22 @@ export function Cart({ isOpen, onClose, onCheckout, onNavigate }: CartProps) {
     }
   };
 
-  const updateQuantity = (id: string, newQuantity: number) => {
+  const updateQuantity = (itemId: string, newQuantity: number) => {
     if (newQuantity < 1) return;
-    const updatedCart = cartItems.map(item =>
-      item.id === id ? { ...item, quantity: newQuantity } : item
-    );
+    const updatedCart = cartItems.map(item => {
+      // Use cartItemId if available, otherwise fallback to id
+      const currentId = item.cartItemId || item.id;
+      return currentId === itemId ? { ...item, quantity: newQuantity } : item;
+    });
     setCartItems(updatedCart);
     localStorage.setItem('cart', JSON.stringify(updatedCart));
   };
 
-  const removeItem = (id: string) => {
-    const updatedCart = cartItems.filter(item => item.id !== id);
+  const removeItem = (itemId: string) => {
+    const updatedCart = cartItems.filter(item => {
+      const currentId = item.cartItemId || item.id;
+      return currentId !== itemId;
+    });
     setCartItems(updatedCart);
     localStorage.setItem('cart', JSON.stringify(updatedCart));
   };
@@ -140,9 +148,14 @@ export function Cart({ isOpen, onClose, onCheckout, onNavigate }: CartProps) {
                 </div>
               ) : (
                 <>
-                  {cartItems.map((item) => (
+                  {cartItems.map((item, index) => {
+                    // Determine unique key for React list
+                    const uniqueKey = item.cartItemId || `${item.id}-${index}`;
+                    const itemId = item.cartItemId || item.id;
+
+                    return (
                     <motion.div
-                      key={item.id}
+                      key={uniqueKey}
                       layout
                       initial={{ opacity: 0, y: 20 }}
                       animate={{ opacity: 1, y: 0 }}
@@ -166,14 +179,23 @@ export function Cart({ isOpen, onClose, onCheckout, onNavigate }: CartProps) {
                       <div className="flex-1 min-w-0">
                         <h3 className="font-semibold text-gray-900 truncate">{item.name}</h3>
                         {item.category && (
-                          <p className="text-xs text-gray-500 mb-2">{item.category}</p>
+                          <p className="text-xs text-gray-500 mb-1">{item.category}</p>
+                        )}
+                        {item.attributes && Object.keys(item.attributes).length > 0 && (
+                           <div className="flex flex-wrap gap-1 mb-2">
+                             {Object.entries(item.attributes).map(([key, val]) => (
+                               <span key={key} className="text-xs bg-white px-2 py-0.5 rounded border border-gray-200 text-gray-600">
+                                 {key}: {String(val)}
+                               </span>
+                             ))}
+                           </div>
                         )}
                         <p className="text-lg font-bold text-red-600">${item.price.toFixed(2)}</p>
 
                         {/* Quantity Controls */}
                         <div className="flex items-center gap-2 mt-2">
                           <button
-                            onClick={() => updateQuantity(item.id, item.quantity - 1)}
+                            onClick={() => updateQuantity(itemId, item.quantity - 1)}
                             className="w-7 h-7 rounded-lg bg-white border border-gray-300 flex items-center justify-center hover:bg-gray-50 transition-colors"
                           >
                             <Minus className="w-3 h-3 text-gray-600" />
@@ -182,7 +204,7 @@ export function Cart({ isOpen, onClose, onCheckout, onNavigate }: CartProps) {
                             {item.quantity}
                           </span>
                           <button
-                            onClick={() => updateQuantity(item.id, item.quantity + 1)}
+                            onClick={() => updateQuantity(itemId, item.quantity + 1)}
                             className="w-7 h-7 rounded-lg bg-white border border-gray-300 flex items-center justify-center hover:bg-gray-50 transition-colors"
                           >
                             <Plus className="w-3 h-3 text-gray-600" />
@@ -192,13 +214,13 @@ export function Cart({ isOpen, onClose, onCheckout, onNavigate }: CartProps) {
 
                       {/* Remove Button */}
                       <button
-                        onClick={() => removeItem(item.id)}
+                        onClick={() => removeItem(itemId)}
                         className="p-2 h-fit hover:bg-red-50 rounded-lg transition-colors group"
                       >
                         <Trash2 className="w-5 h-5 text-gray-400 group-hover:text-red-600 transition-colors" />
                       </button>
                     </motion.div>
-                  ))}
+                  )})}
 
                   {/* Clear Cart Button */}
                   {cartItems.length > 0 && (

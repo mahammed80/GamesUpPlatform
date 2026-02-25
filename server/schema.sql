@@ -62,6 +62,7 @@ CREATE TABLE IF NOT EXISTS orders (
   digital_email VARCHAR(255),
   digital_password VARCHAR(255),
   digital_code VARCHAR(255),
+  digital_delivery JSON,
   inventory_id VARCHAR(50),
   payment_method VARCHAR(50),
   payment_proof VARCHAR(255),

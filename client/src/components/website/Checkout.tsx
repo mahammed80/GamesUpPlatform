@@ -79,9 +79,13 @@ export function Checkout({ onBack, onSuccess }: CheckoutProps) {
       
       if (data.success) {
         // Payment successful
-        const cart = JSON.parse(localStorage.getItem('cart') || '[]');
-        setPurchasedItems(cart);
-        setCartItems(cart); // Ensure cartItems is set for success view
+        if (data.purchasedItems) {
+            setPurchasedItems(data.purchasedItems);
+        } else {
+            const cart = JSON.parse(localStorage.getItem('cart') || '[]');
+            setPurchasedItems(cart);
+        }
+        setCartItems([]); // Clear cart items
         localStorage.setItem('cart', JSON.stringify([]));
         setStep('success');
       } else {
@@ -285,9 +289,13 @@ export function Checkout({ onBack, onSuccess }: CheckoutProps) {
             }
           } else {
             // COD or Instapay - Direct Success
-            const cart = JSON.parse(localStorage.getItem('cart') || '[]');
-            setPurchasedItems(cart);
-            setCartItems(cart);
+            if (data.purchasedItems) {
+                setPurchasedItems(data.purchasedItems);
+            } else {
+                const cart = JSON.parse(localStorage.getItem('cart') || '[]');
+                setPurchasedItems(cart);
+            }
+            setCartItems([]);
             localStorage.setItem('cart', JSON.stringify([]));
             setStep('success');
             setLoading(false);
@@ -375,35 +383,95 @@ export function Checkout({ onBack, onSuccess }: CheckoutProps) {
                         </div>
                       </div>
                       
-                      {item.digitalItem ? (
-                        <div className="mt-3 p-3 bg-blue-50 rounded-md border border-blue-100">
-                          {item.digitalItem.code && (
-                            <div className="mb-2">
+                      {(item.digitalItem || item.digital_key) ? (
+                        (() => {
+                          const digital = item.digitalItem || item.digital_key;
+                          return (
+                        <div className="mt-3 p-3 bg-blue-50 rounded-md border border-blue-100 space-y-3">
+                          {digital.code && (
+                            <div>
                               <span className="text-xs font-semibold text-blue-600 uppercase tracking-wider block mb-1">Code</span>
-                              <div className="font-mono text-lg font-bold text-gray-800 bg-white px-3 py-1 rounded border border-blue-200 inline-block select-all">
-                                {item.digitalItem.code}
+                              <div className="font-mono text-lg font-bold text-gray-800 bg-white px-3 py-1 rounded border border-blue-200 inline-block select-all break-all">
+                                {digital.code}
                               </div>
                             </div>
                           )}
                           
-                          {item.digitalItem.email && (
-                            <div className="mb-2">
+                          {digital.email && (
+                            <div>
                               <span className="text-xs font-semibold text-blue-600 uppercase tracking-wider block mb-1">Email</span>
-                              <div className="font-mono text-gray-800 bg-white px-3 py-1 rounded border border-blue-200 inline-block select-all">
-                                {item.digitalItem.email}
+                              <div className="font-mono text-gray-800 bg-white px-3 py-1 rounded border border-blue-200 inline-block select-all break-all">
+                                {digital.email}
                               </div>
                             </div>
                           )}
                           
-                          {item.digitalItem.password && (
+                          {digital.password && (
                             <div>
                               <span className="text-xs font-semibold text-blue-600 uppercase tracking-wider block mb-1">Password</span>
-                              <div className="font-mono text-gray-800 bg-white px-3 py-1 rounded border border-blue-200 inline-block select-all">
-                                {item.digitalItem.password}
+                              <div className="font-mono text-gray-800 bg-white px-3 py-1 rounded border border-blue-200 inline-block select-all break-all">
+                                {digital.password}
                               </div>
+                            </div>
+                          )}
+
+                          {/* Extra Fields */}
+                          {digital.outlookEmail && (
+                            <div>
+                              <span className="text-xs font-semibold text-blue-600 uppercase tracking-wider block mb-1">Outlook Email</span>
+                              <div className="font-mono text-gray-800 bg-white px-3 py-1 rounded border border-blue-200 inline-block select-all break-all">
+                                {digital.outlookEmail}
+                              </div>
+                            </div>
+                          )}
+
+                          {digital.outlookPassword && (
+                            <div>
+                              <span className="text-xs font-semibold text-blue-600 uppercase tracking-wider block mb-1">Outlook Password</span>
+                              <div className="font-mono text-gray-800 bg-white px-3 py-1 rounded border border-blue-200 inline-block select-all break-all">
+                                {digital.outlookPassword}
+                              </div>
+                            </div>
+                          )}
+
+                          {digital.birthdate && (
+                            <div>
+                              <span className="text-xs font-semibold text-blue-600 uppercase tracking-wider block mb-1">Birthdate</span>
+                              <div className="font-mono text-gray-800 bg-white px-3 py-1 rounded border border-blue-200 inline-block select-all break-all">
+                                {digital.birthdate}
+                              </div>
+                            </div>
+                          )}
+
+                          {digital.region && (
+                            <div>
+                              <span className="text-xs font-semibold text-blue-600 uppercase tracking-wider block mb-1">Region</span>
+                              <div className="font-mono text-gray-800 bg-white px-3 py-1 rounded border border-blue-200 inline-block select-all break-all">
+                                {digital.region}
+                              </div>
+                            </div>
+                          )}
+
+                          {digital.onlineId && (
+                            <div>
+                              <span className="text-xs font-semibold text-blue-600 uppercase tracking-wider block mb-1">Online ID</span>
+                              <div className="font-mono text-gray-800 bg-white px-3 py-1 rounded border border-blue-200 inline-block select-all break-all">
+                                {digital.onlineId}
+                              </div>
+                            </div>
+                          )}
+
+                          {digital.backupCodes && (
+                            <div>
+                              <span className="text-xs font-semibold text-blue-600 uppercase tracking-wider block mb-1">Backup Codes</span>
+                              <pre className="font-mono text-sm text-gray-800 bg-white px-3 py-2 rounded border border-blue-200 overflow-x-auto whitespace-pre-wrap select-all">
+                                {digital.backupCodes}
+                              </pre>
                             </div>
                           )}
                         </div>
+                          );
+                        })()
                       ) : (
                         <div className="mt-3 text-amber-600 text-sm italic">
                           Product details will be sent to your email.
