@@ -221,18 +221,30 @@ if (dbHost === '127.0.0.1') {
 const socketPaths = [
   '/var/run/mysqld/mysqld.sock',
   '/var/lib/mysql/mysql.sock',
-  '/tmp/mysql.sock'
+  '/tmp/mysql.sock',
+  '/run/mysqld/mysqld.sock',
+  '/var/mysql/mysql.sock'
 ];
 let socketPath = process.env.DB_SOCKET_PATH;
 
 try {
-  if (!socketPath && dbHost === 'localhost' && process.platform !== 'win32') {
+  if (!socketPath && (dbHost === 'localhost' || dbHost === '127.0.0.1') && process.platform !== 'win32') {
+    // 1. Try to find existing socket
     for (const path of socketPaths) {
       if (fs.existsSync(path)) {
         socketPath = path;
         console.log('✅ Found MySQL socket at:', socketPath);
         break;
       }
+    }
+
+    // 2. If no socket found, but we are on Linux/Hostinger, Force a likely socket path
+    //    because TCP 127.0.0.1 is often blocked or treated as different user host.
+    if (!socketPath) {
+       console.log('⚠️  No socket found via auto-detection. forcing standard Hostinger socket path as fallback.');
+       // Standard path for cPanel/Hostinger
+       socketPath = '/var/lib/mysql/mysql.sock';
+       console.log('🔌 Force-using Socket fallback:', socketPath);
     }
   }
 } catch (e) {
@@ -256,7 +268,7 @@ if (socketPath) {
   console.log('🔌 Connecting via TCP:', dbHost);
   poolConfig.host = dbHost;
   poolConfig.port = process.env.DB_PORT || 3306;
-  poolConfig.family = 4; // Force IPv4
+  // poolConfig.family = 4; // Removed to allow system default resolution
 }
 
 const pool = mysql.createPool(poolConfig);
