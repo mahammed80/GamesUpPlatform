@@ -211,12 +211,11 @@ const isProduction = process.env.NODE_ENV === 'production' || process.env.DB_HOS
 // Force IPv4 if DB_HOST is localhost to avoid ::1 (IPv6) connection issues
 let dbHost = process.env.DB_HOST || 'localhost';
 
-// HOSTINGER FIX: Force 'localhost' if '127.0.0.1' is specified
-// Hostinger's MySQL server treats 'localhost' (socket) and '127.0.0.1' (TCP) differently for authentication.
-// The user 'u268537024_games' is likely only allowed from 'localhost'.
-if (dbHost === '127.0.0.1') {
-  console.log('⚠️  Converting DB_HOST 127.0.0.1 to localhost for Hostinger compatibility');
-  dbHost = 'localhost';
+// HOSTINGER FIX: Force '127.0.0.1' if 'localhost' is specified to avoid IPv6 issues
+// But ensure we use the correct user permissions
+if (dbHost === 'localhost') {
+  console.log('⚠️  Converting DB_HOST localhost to 127.0.0.1 to avoid IPv6 issues');
+  dbHost = '127.0.0.1';
 }
 
 const pool = mysql.createPool({
