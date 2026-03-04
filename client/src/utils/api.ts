@@ -198,6 +198,38 @@ export const bannersAPI = {
   }),
 };
 
+// Categories API
+export const categoriesAPI = {
+  getAll: () => fetchAPI('/system/categories'),
+  create: (category: any) => fetchAPI('/system/categories', {
+    method: 'POST',
+    body: JSON.stringify(category),
+  }),
+  update: (id: string | number, category: any) => fetchAPI(`/system/categories/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(category),
+  }),
+  delete: (id: string | number) => fetchAPI(`/system/categories/${id}`, {
+    method: 'DELETE',
+  }),
+};
+
+// Categories API
+export const categoriesAPI = {
+  getAll: () => fetchAPI('/system/categories'),
+  create: (category: any) => fetchAPI('/system/categories', {
+    method: 'POST',
+    body: JSON.stringify(category),
+  }),
+  update: (id: string | number, category: any) => fetchAPI(`/system/categories/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(category),
+  }),
+  delete: (id: string | number) => fetchAPI(`/system/categories/${id}`, {
+    method: 'DELETE',
+  }),
+};
+
 // HR API
 export const hrAPI = {
   getAttendance: (date: string) => fetchAPI(`/hr/attendance?date=${date}`),
