@@ -813,9 +813,28 @@ app.post(`${BASE_PATH}/auth/login`, async (req, res) => {
 
   } catch (error) {
     console.error('Login error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    // Return detailed error for debugging
+    res.status(500).json({ 
+      error: 'Internal server error', 
+      details: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
   }
 });
+
+// Database Keep-Alive
+// Hostinger (and other shared hosts) often kill idle connections.
+// This interval sends a lightweight query every minute to keep the connection active.
+setInterval(async () => {
+  try {
+    const connection = await pool.getConnection();
+    await connection.query('SELECT 1');
+    connection.release();
+    // console.log('💓 Database keep-alive ping successful');
+  } catch (err) {
+    console.error('💓 Database keep-alive failed:', err.message);
+  }
+}, 60000); // Every 60 seconds
 
 // Change Password Route
 app.post(`${BASE_PATH}/auth/change-password`, async (req, res) => {
