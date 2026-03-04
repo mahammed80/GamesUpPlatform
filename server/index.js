@@ -212,25 +212,51 @@ const isProduction = process.env.NODE_ENV === 'production' || process.env.DB_HOS
 let dbHost = process.env.DB_HOST || 'localhost';
 
 // HOSTINGER FIX: Force 'localhost' if '127.0.0.1' is specified
-// Hostinger's MySQL server treats 'localhost' (socket) and '127.0.0.1' (TCP) differently for authentication.
-// The user 'u268537024_games' is likely only allowed from 'localhost'.
 if (dbHost === '127.0.0.1') {
   console.log('⚠️  Converting DB_HOST 127.0.0.1 to localhost for Hostinger compatibility');
   dbHost = 'localhost';
 }
 
-const pool = mysql.createPool({
-  host: dbHost,
+// Auto-detect MySQL Socket on Hostinger/Linux
+const fs = require('fs');
+const socketPaths = [
+  '/var/run/mysqld/mysqld.sock',
+  '/var/lib/mysql/mysql.sock',
+  '/tmp/mysql.sock'
+];
+let socketPath = process.env.DB_SOCKET_PATH;
+
+if (!socketPath && dbHost === 'localhost' && process.platform !== 'win32') {
+  for (const path of socketPaths) {
+    if (fs.existsSync(path)) {
+      socketPath = path;
+      console.log('✅ Found MySQL socket at:', socketPath);
+      break;
+    }
+  }
+}
+
+const poolConfig = {
   user: process.env.DB_USER,
   password: process.env.DB_PASSWORD,
   database: process.env.DB_NAME,
-  port: process.env.DB_PORT || 3306,
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0,
   multipleStatements: true,
-  family: 4 // Force IPv4 lookup (avoids ::1) but keeps 'localhost' semantics
-});
+};
+
+if (socketPath) {
+  console.log('🔌 Connecting via Socket:', socketPath);
+  poolConfig.socketPath = socketPath;
+} else {
+  console.log('🔌 Connecting via TCP:', dbHost);
+  poolConfig.host = dbHost;
+  poolConfig.port = process.env.DB_PORT || 3306;
+  poolConfig.family = 4; // Force IPv4
+}
+
+const pool = mysql.createPool(poolConfig);
 
 let ordersTableColumnsCache = null;
 
