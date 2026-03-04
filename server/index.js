@@ -218,7 +218,6 @@ if (dbHost === '127.0.0.1') {
 }
 
 // Auto-detect MySQL Socket on Hostinger/Linux
-const fs = require('fs');
 const socketPaths = [
   '/var/run/mysqld/mysqld.sock',
   '/var/lib/mysql/mysql.sock',
@@ -226,14 +225,18 @@ const socketPaths = [
 ];
 let socketPath = process.env.DB_SOCKET_PATH;
 
-if (!socketPath && dbHost === 'localhost' && process.platform !== 'win32') {
-  for (const path of socketPaths) {
-    if (fs.existsSync(path)) {
-      socketPath = path;
-      console.log('✅ Found MySQL socket at:', socketPath);
-      break;
+try {
+  if (!socketPath && dbHost === 'localhost' && process.platform !== 'win32') {
+    for (const path of socketPaths) {
+      if (fs.existsSync(path)) {
+        socketPath = path;
+        console.log('✅ Found MySQL socket at:', socketPath);
+        break;
+      }
     }
   }
+} catch (e) {
+  console.error('⚠️  Failed to auto-detect MySQL socket:', e.message);
 }
 
 const poolConfig = {
@@ -3342,7 +3345,8 @@ async function runMigrations() {
   }
 }
 
-runMigrations().then(() => {
+// Start server immediately to avoid timeouts on Hostinger
+const startServer = () => {
   app.listen(port, () => {
     console.log(`🚀 Server running on port ${port}`);
     console.log(`🌐 Base URL: http://localhost:${port}${BASE_PATH}`);
@@ -3360,7 +3364,16 @@ runMigrations().then(() => {
     }
     process.exit(1);
   });
+};
+
+// Run migrations in the background
+runMigrations().then(() => {
+  console.log('✅ Database migrations checked.');
+}).catch(err => {
+  console.error('❌ Database migration check failed:', err);
 });
+
+startServer();
 
 process.on('uncaughtException', (error) => {
   console.error('Uncaught Exception:', error);
