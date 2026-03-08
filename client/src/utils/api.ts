@@ -214,22 +214,6 @@ export const categoriesAPI = {
   }),
 };
 
-// Categories API
-export const categoriesAPI = {
-  getAll: () => fetchAPI('/system/categories'),
-  create: (category: any) => fetchAPI('/system/categories', {
-    method: 'POST',
-    body: JSON.stringify(category),
-  }),
-  update: (id: string | number, category: any) => fetchAPI(`/system/categories/${id}`, {
-    method: 'PUT',
-    body: JSON.stringify(category),
-  }),
-  delete: (id: string | number) => fetchAPI(`/system/categories/${id}`, {
-    method: 'DELETE',
-  }),
-};
-
 // HR API
 export const hrAPI = {
   getAttendance: (date: string) => fetchAPI(`/hr/attendance?date=${date}`),
@@ -283,6 +267,7 @@ export const rolesAPI = {
 // Admin API
 export const adminAPI = {
   getSoldProducts: () => fetchAPI('/admin/sold-products'),
+  getAnalytics: (timeRange: string = '12months') => fetchAPI(`/admin/analytics?timeRange=${timeRange}`),
 };
 
 // Generic API
@@ -291,4 +276,28 @@ export const api = {
   post: (endpoint: string, body: any) => fetchAPI(endpoint, { method: 'POST', body: JSON.stringify(body) }),
   put: (endpoint: string, body: any) => fetchAPI(endpoint, { method: 'PUT', body: JSON.stringify(body) }),
   delete: (endpoint: string) => fetchAPI(endpoint, { method: 'DELETE' }),
+};
+
+// File Upload API
+export const uploadAPI = {
+  uploadImage: async (file: File) => {
+    const formData = new FormData();
+    formData.append('image', file);
+    
+    const token = accessToken || publicAnonKey;
+    const response = await fetch(`${BASE_URL}/upload`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Upload failed' }));
+      throw new Error(error.error || `Upload failed with status ${response.status}`);
+    }
+
+    return response.json();
+  },
 };

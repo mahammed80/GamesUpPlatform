@@ -7,6 +7,20 @@ import { publicAnonKey } from '../../utils/supabase/info';
 import { BASE_URL } from '../../utils/api';
 import { useStoreSettings } from '../../context/StoreSettingsContext';
 
+interface DigitalItem {
+  email: string;
+  password: string;
+  code: string;
+  outlookEmail: string;
+  outlookPassword: string;
+  birthdate: string;
+  region: string;
+  onlineId: string;
+  backupCodes: string;
+  slots: Record<string, { sold: boolean; orderId: string | null; code: string }>;
+  totalCodes: number;
+}
+
 interface Product {
   id: string;
   name: string;
@@ -16,6 +30,7 @@ interface Product {
   categorySlug?: string;
   stock: number;
   attributes?: Record<string, any>;
+  digitalItems?: DigitalItem[];
 }
 
 interface Category {
@@ -28,7 +43,8 @@ interface Category {
 
 interface CartItem extends Product {
   quantity: number;
-  selectedAttributes?: Record<string, string>;
+  selectedDigitalItem?: DigitalItem;
+  selectedSlot?: string;
 }
 
 interface CustomerInfo {
@@ -46,6 +62,8 @@ export function POSNew() {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [selectedDigitalItem, setSelectedDigitalItem] = useState<DigitalItem | null>(null);
+  const [selectedSlot, setSelectedSlot] = useState<string>('');
   const [showCustomerForm, setShowCustomerForm] = useState(false);
   const [customerInfo, setCustomerInfo] = useState<CustomerInfo>({
     name: '',
@@ -88,11 +106,8 @@ export function POSNew() {
 
   const loadProducts = async () => {
     try {
-      const url = selectedCategory
-        ? `${BASE_URL}/public/products?category=${selectedCategory}`
-        : `${BASE_URL}/public/products`;
-
-      const response = await fetch(url, {
+      setLoading(true);
+      const response = await fetch(`${BASE_URL}/public/products`, {
         headers: {
           'Authorization': `Bearer ${publicAnonKey}`,
         },
@@ -100,10 +115,45 @@ export function POSNew() {
 
       if (response.ok) {
         const data = await response.json();
-        setProducts(data.products || []);
+        const productsWithDigitalItems = data.products.map((product: any) => {
+          // Parse digital items if they exist
+          let digitalItems = [];
+          try {
+            digitalItems = typeof product.digital_items === 'string' 
+              ? JSON.parse(product.digital_items) 
+              : (product.digital_items || []);
+          } catch (e) {
+            console.error('Error parsing digital items for product', product.id, e);
+            digitalItems = [];
+          }
+          
+          // Ensure digitalItems is an array
+          if (!Array.isArray(digitalItems)) {
+            digitalItems = [];
+          }
+          
+          // Count available offline slots
+          let availableOfflineSlots = 0;
+          digitalItems.forEach((item: any) => {
+            if (item && item.slots) {
+              if (item.slots['Offline ps4'] && !item.slots['Offline ps4'].sold) availableOfflineSlots++;
+              if (item.slots['Offline ps5'] && !item.slots['Offline ps5'].sold) availableOfflineSlots++;
+            }
+          });
+
+          return {
+            ...product,
+            digitalItems,
+            stock: availableOfflineSlots // Update stock to reflect available offline slots
+          };
+        }).filter((product: any) => product.stock > 0); // Only show products with available offline slots
+
+        setProducts(productsWithDigitalItems);
       }
     } catch (error) {
       console.error('Error loading products:', error);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -112,17 +162,17 @@ export function POSNew() {
     product.description?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const addToCart = (product: Product, quantity: number = 1) => {
+  const addToCart = (product: Product, quantity: number = 1, selectedDigitalItem?: DigitalItem, selectedSlot?: string) => {
     const existingItem = cart.find(item => item.id === product.id);
     
     if (existingItem) {
       setCart(cart.map(item =>
         item.id === product.id
-          ? { ...item, quantity: item.quantity + quantity }
+          ? { ...item, quantity: item.quantity + quantity, selectedDigitalItem, selectedSlot }
           : item
       ));
     } else {
-      setCart([...cart, { ...product, quantity }]);
+      setCart([...cart, { ...product, quantity, selectedDigitalItem, selectedSlot }]);
     }
     
     setSelectedProduct(null);
@@ -452,7 +502,7 @@ export function POSNew() {
                   </div>
                   <button
                     onClick={() => removeFromCart(item.id)}
-                    className="text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 p-1 rounded"
+                    className="text-white hover:bg-red-600 dark:hover:bg-red-600 p-1 rounded bg-red-600"
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>
@@ -462,14 +512,14 @@ export function POSNew() {
                     onClick={() => updateQuantity(item.id, item.quantity - 1)}
                     className="w-8 h-8 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded flex items-center justify-center"
                   >
-                    <Minus className="w-4 h-4" />
+                    <Minus className="w-4 h-4 text-red-600" />
                   </button>
                   <span className="w-12 text-center font-semibold text-gray-900 dark:text-white">{item.quantity}</span>
                   <button
                     onClick={() => updateQuantity(item.id, item.quantity + 1)}
                     className="w-8 h-8 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded flex items-center justify-center"
                   >
-                    <Plus className="w-4 h-4" />
+                    <Plus className="w-4 h-4 text-red-600" />
                   </button>
                   <span className="ml-auto font-bold text-gray-900 dark:text-white">
                     {formatPrice(item.price * item.quantity)}

@@ -47,6 +47,17 @@ export function ShopPage({ onNavigate, onOpenCart }: ShopPageProps) {
     loadProducts();
   }, [selectedCategory]);
 
+  useEffect(() => {
+    if (selectedCategory) {
+      const category = categories.find(cat => cat.slug === selectedCategory);
+      if (category) {
+        document.title = `${category.name} - Games Up`;
+      }
+    } else {
+      document.title = 'Shop - Games Up';
+    }
+  }, [selectedCategory, categories]);
+
   const loadCategories = async () => {
     try {
       const response = await fetch(
@@ -152,10 +163,16 @@ export function ShopPage({ onNavigate, onOpenCart }: ShopPageProps) {
           className="mb-12"
         >
           <h1 className="text-4xl md:text-5xl font-bold mb-4 bg-gradient-to-r from-gray-900 to-red-600 bg-clip-text text-transparent">
-            Shop All Products
+            {selectedCategory 
+              ? `${categories.find(cat => cat.slug === selectedCategory)?.name || selectedCategory}` 
+              : 'Shop All Products'
+            }
           </h1>
           <p className="text-xl text-gray-600">
-            Browse our extensive collection of gaming products
+            {selectedCategory 
+              ? `Browse our collection of ${categories.find(cat => cat.slug === selectedCategory)?.name?.toLowerCase() || selectedCategory}`
+              : 'Browse our extensive collection of gaming products'
+            }
           </p>
         </motion.div>
 

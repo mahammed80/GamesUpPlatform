@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Package, Users, ShoppingCart, Key, Search, Mail, Calendar, List, Tag, User } from 'lucide-react';
+import { Package, ShoppingCart, Key, Search, List, Tag, User } from 'lucide-react';
 import { Card } from '../ui/card';
 import { productsAPI, customersAPI, categoriesAPI } from '../../utils/api';
 
@@ -43,20 +43,71 @@ export function ProductDataOverview() {
   const [products, setProducts] = useState<any[]>([]);
   const [customers, setCustomers] = useState<any[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
-  const [selectedProductId, setSelectedProductId] = useState<string>('');
+  const [selectedProductId, setSelectedProductId] = useState<string>('all');
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState<ProductOverview | null>(null);
-  const [activeTab, setActiveTab] = useState<'overview' | 'inventory' | 'sold' | 'customers'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'inventory' | 'sold' | 'customers' | 'products_inventory'>('products_inventory');
+  const [allProductsInventory, setAllProductsInventory] = useState<any[]>([]);
+  const [componentError, setComponentError] = useState<string | null>(null);
+  const [visibleSlots, setVisibleSlots] = useState({
+    'Primary ps4': true,
+    'Primary ps5': true,
+    'Secondary': true,
+    'Offline ps4': false,
+    'Offline ps5': false
+  });
+
+  // Filter inventory based on selected product
+  const filteredInventory = selectedProductId === 'all' 
+    ? allProductsInventory 
+    : allProductsInventory.filter(item => item.productId.toString() === selectedProductId);
+
+  // Get only products that have digital items for dropdown
+  const productsWithDigitalItems = products.filter(product => 
+    allProductsInventory.some(item => item.productId.toString() === product.id.toString())
+  );
+
+  // Error boundary for component
+  if (componentError) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <div className="text-center">
+          <div className="text-red-600 dark:text-red-400 mb-4">Something went wrong</div>
+          <div className="text-sm text-gray-500 dark:text-gray-400">{componentError}</div>
+          <button 
+            onClick={() => setComponentError(null)}
+            className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   useEffect(() => {
-    loadProducts();
-    loadCustomers();
-    loadCategories();
+    const loadData = async () => {
+      try {
+        await loadProducts();
+        await loadCustomers();
+        await loadCategories();
+        await loadAllProductsInventory();
+      } catch (error) {
+        console.error('Error loading data:', error);
+        setComponentError('Failed to load data. Please try again.');
+      }
+    };
+    
+    loadData();
   }, []);
 
   useEffect(() => {
     if (selectedProductId) {
-      loadOverview(selectedProductId);
+      if (selectedProductId === 'all') {
+        setActiveTab('products_inventory');
+      } else {
+        loadOverview(selectedProductId);
+      }
     }
   }, [selectedProductId]);
 
@@ -66,8 +117,9 @@ export function ProductDataOverview() {
       if (res.products || Array.isArray(res)) {
         const productList = res.products || res;
         setProducts(productList);
-        if (productList.length > 0 && !selectedProductId) {
-          setSelectedProductId(productList[0].id.toString());
+        // Default to "all" products view instead of first product
+        if (!selectedProductId || selectedProductId !== 'all') {
+          setSelectedProductId('all');
         }
       }
     } catch (err) {
@@ -100,10 +152,97 @@ export function ProductDataOverview() {
   const loadOverview = async (id: string) => {
     setLoading(true);
     try {
+      console.log('Loading overview for product ID:', id);
       const res = await productsAPI.getOverview(id);
-      setData(res);
+      console.log('Overview response:', res);
+      
+      // Validate the response structure
+      if (!res || typeof res !== 'object') {
+        console.error('Invalid overview response:', res);
+        setData(null);
+        return;
+      }
+      
+      // Ensure stats object exists with default values
+      const safeData = {
+        ...res,
+        stats: {
+          totalSold: res.stats?.totalSold || 0,
+          totalRemaining: res.stats?.totalRemaining || 0
+        },
+        product: res.product || { id: 0, name: 'Unknown Product', image: '' },
+        soldItems: Array.isArray(res.soldItems) ? res.soldItems : [],
+        customers: Array.isArray(res.customers) ? res.customers : [],
+        remainingItems: Array.isArray(res.remainingItems) ? res.remainingItems : []
+      };
+      
+      console.log('Safe data set:', safeData);
+      setData(safeData);
     } catch (err) {
-      console.error('Failed to load overview', err);
+      console.error('Failed to load overview:', err);
+      setData(null);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadAllProductsInventory = async () => {
+    try {
+      setLoading(true);
+      console.log('🔄 Loading products inventory...');
+      const res = await productsAPI.getAll();
+      console.log('Products API response:', res);
+      
+      if (res.products || Array.isArray(res)) {
+        const productList = res.products || res;
+        console.log('Product list:', productList);
+        const inventoryData = [];
+        
+        for (const product of productList) {
+          console.log('Processing product:', product.name, 'digital_items:', product.digital_items);
+          
+          try {
+            const digitalItems = typeof product.digital_items === 'string' 
+              ? JSON.parse(product.digital_items) 
+              : (product.digital_items || []);
+            
+            console.log('Parsed digital items:', digitalItems);
+            
+            if (Array.isArray(digitalItems) && digitalItems.length > 0) {
+              for (const digitalItem of digitalItems) {
+                // Only add to inventory if there's actual data
+                if (digitalItem.email || digitalItem.password || digitalItem.code || 
+                    digitalItem.region || digitalItem.onlineId || digitalItem.outlookEmail) {
+                  inventoryData.push({
+                    productId: product.id,
+                    productName: product.name,
+                    email: digitalItem.email || '',
+                    sonyPass: digitalItem.password || '',
+                    emailPass: digitalItem.password || '',
+                    codes: digitalItem.slots || {},
+                    region: digitalItem.region || '',
+                    onlineId: digitalItem.onlineId || ''
+                  });
+                  console.log('✅ Added inventory item for:', product.name);
+                }
+              }
+            }
+          } catch (e) {
+            console.error('Error parsing digital items for product:', product.id, e);
+            // Skip products with parsing errors to avoid empty rows
+          }
+        }
+        
+        console.log('Final inventory data:', inventoryData);
+        console.log('📊 Total inventory items:', inventoryData.length);
+        setAllProductsInventory(inventoryData);
+      } else {
+        console.warn('⚠️ No products data found in response');
+        setAllProductsInventory([]);
+      }
+    } catch (err) {
+      console.error('❌ Failed to load products inventory:', err);
+      setAllProductsInventory([]);
     } finally {
       setLoading(false);
     }
@@ -118,8 +257,8 @@ export function ProductDataOverview() {
       <div className="space-y-6">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
-            <h2 className="text-xl font-bold text-gray-900 dark:text-white">Detailed Product Analytics</h2>
-            <p className="text-gray-500 dark:text-gray-400">Select a product to view specific metrics</p>
+            <h2 className="text-xl font-bold text-gray-900 dark:text-white">Products Inventory Overview</h2>
+            <p className="text-gray-500 dark:text-gray-400">View all products inventory data or select a specific product</p>
           </div>
           <div className="w-full md:w-64">
             <select
@@ -127,7 +266,8 @@ export function ProductDataOverview() {
               onChange={(e) => setSelectedProductId(e.target.value)}
               className="w-full px-4 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 text-gray-900 dark:text-white"
             >
-              {products.map(p => (
+              <option value="all">All Products</option>
+              {productsWithDigitalItems.map(p => (
                 <option key={p.id} value={p.id}>{p.name}</option>
               ))}
             </select>
@@ -151,7 +291,7 @@ export function ProductDataOverview() {
                   <div>
                     <p className="text-sm font-medium text-blue-600 dark:text-blue-400">Total Inventory</p>
                     <h3 className="text-2xl font-bold text-gray-900 dark:text-white">
-                      {data.stats.totalRemaining + data.stats.totalSold}
+                      {(data?.stats?.totalRemaining || 0) + (data?.stats?.totalSold || 0)}
                     </h3>
                   </div>
                 </div>
@@ -165,7 +305,7 @@ export function ProductDataOverview() {
                   <div>
                     <p className="text-sm font-medium text-green-600 dark:text-green-400">Sold Items</p>
                     <h3 className="text-2xl font-bold text-gray-900 dark:text-white">
-                      {data.stats.totalSold}
+                      {data?.stats?.totalSold || 0}
                     </h3>
                   </div>
                 </div>
@@ -179,7 +319,7 @@ export function ProductDataOverview() {
                   <div>
                     <p className="text-sm font-medium text-orange-600 dark:text-orange-400">Remaining Stock</p>
                     <h3 className="text-2xl font-bold text-gray-900 dark:text-white">
-                      {data.stats.totalRemaining}
+                      {data?.stats?.totalRemaining || 0}
                     </h3>
                   </div>
                 </div>
@@ -191,43 +331,53 @@ export function ProductDataOverview() {
               <nav className="flex gap-6">
                 <button
                   onClick={() => setActiveTab('overview')}
-                  className={`py-4 px-2 border-b-2 font-medium text-sm transition-colors ${
+                  className={`py-4 px-2 border-b-2 font-medium text-sm transition-all rounded-t-lg ${
                     activeTab === 'overview'
-                      ? 'border-red-600 text-red-600'
-                      : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
+                      ? 'border-red-600 text-red-600 bg-red-50 dark:bg-red-900/20'
+                      : 'border-transparent text-black hover:text-red-600 hover:bg-red-50 dark:text-gray-400 dark:hover:text-red-400'
                   }`}
                 >
                   Overview
                 </button>
                 <button
                   onClick={() => setActiveTab('sold')}
-                  className={`py-4 px-2 border-b-2 font-medium text-sm transition-colors ${
+                  className={`py-4 px-2 border-b-2 font-medium text-sm transition-all rounded-t-lg ${
                     activeTab === 'sold'
-                      ? 'border-red-600 text-red-600'
-                      : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
+                      ? 'border-red-600 text-red-600 bg-red-50 dark:bg-red-900/20'
+                      : 'border-transparent text-black hover:text-red-600 hover:bg-red-50 dark:text-gray-400 dark:hover:text-red-400'
                   }`}
                 >
                   Sold / Used Keys
                 </button>
                 <button
                   onClick={() => setActiveTab('customers')}
-                  className={`py-4 px-2 border-b-2 font-medium text-sm transition-colors ${
+                  className={`py-4 px-2 border-b-2 font-medium text-sm transition-all rounded-t-lg ${
                     activeTab === 'customers'
-                      ? 'border-red-600 text-red-600'
-                      : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
+                      ? 'border-red-600 text-red-600 bg-red-50 dark:bg-red-900/20'
+                      : 'border-transparent text-black hover:text-red-600 hover:bg-red-50 dark:text-gray-400 dark:hover:text-red-400'
                   }`}
                 >
                   Customers
                 </button>
                 <button
                   onClick={() => setActiveTab('inventory')}
-                  className={`py-4 px-2 border-b-2 font-medium text-sm transition-colors ${
+                  className={`py-4 px-2 border-b-2 font-medium text-sm transition-all rounded-t-lg ${
                     activeTab === 'inventory'
-                      ? 'border-red-600 text-red-600'
-                      : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
+                      ? 'border-red-600 text-red-600 bg-red-50 dark:bg-red-900/20'
+                      : 'border-transparent text-black hover:text-red-600 hover:bg-red-50 dark:text-gray-400 dark:hover:text-red-400'
                   }`}
                 >
                   Remaining Inventory
+                </button>
+                <button
+                  onClick={() => setActiveTab('products_inventory')}
+                  className={`py-4 px-2 border-b-2 font-medium text-sm transition-all rounded-t-lg ${
+                    activeTab === 'products_inventory'
+                      ? 'border-red-600 text-red-600 bg-red-50 dark:bg-red-900/20'
+                      : 'border-transparent text-black hover:text-red-600 hover:bg-red-50 dark:text-gray-400 dark:hover:text-red-400'
+                  }`}
+                >
+                  Products Inventory
                 </button>
               </nav>
             </div>
@@ -363,6 +513,86 @@ export function ProductDataOverview() {
                         <tr>
                           <td colSpan={3} className="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
                             Out of stock
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {activeTab === 'products_inventory' && (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-sm">
+                    <thead className="bg-gray-50 dark:bg-gray-700/50">
+                      <tr>
+                        <th className="px-6 py-3 font-medium text-gray-500 dark:text-gray-400">Product Name</th>
+                        <th className="px-6 py-3 font-medium text-gray-500 dark:text-gray-400">Email</th>
+                        <th className="px-6 py-3 font-medium text-gray-500 dark:text-gray-400">Sony Pass</th>
+                        <th className="px-6 py-3 font-medium text-gray-500 dark:text-gray-400">Email-Pass</th>
+                        <th className="px-6 py-3 font-medium text-gray-500 dark:text-gray-400">Codes</th>
+                        <th className="px-6 py-3 font-medium text-gray-500 dark:text-gray-400 text-center">Show Slots</th>
+                        <th className="px-6 py-3 font-medium text-gray-500 dark:text-gray-400">Region</th>
+                        <th className="px-6 py-3 font-medium text-gray-500 dark:text-gray-400">Online ID</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                      {filteredInventory.map((item, idx) => (
+                        <tr key={idx} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                          <td className="px-6 py-4 text-gray-900 dark:text-white font-medium">
+                            {item.productName}
+                          </td>
+                          <td className="px-6 py-4 text-gray-900 dark:text-white">
+                            <div className="text-sm">{item.email}</div>
+                          </td>
+                          <td className="px-6 py-4 text-gray-900 dark:text-white">
+                            <div className="text-sm font-mono">{item.sonyPass}</div>
+                          </td>
+                          <td className="px-6 py-4 text-gray-900 dark:text-white">
+                            <div className="text-sm font-mono">{item.emailPass}</div>
+                          </td>
+                          <td className="px-6 py-4">
+                            <select className="text-sm bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-red-500">
+                              <option value="">All Codes</option>
+                              <option value="all-codes" style={{ color: '#3b82f6', fontWeight: 'bold' }}>
+                                📋 All Codes ({Object.keys(item.codes || {}).length} slots)
+                              </option>
+                              {Object.entries(item.codes || {}).map(([slotType, slotData]) => (
+                                <option 
+                                  key={slotType} 
+                                  value={slotType}
+                                  style={{ color: slotData.sold ? '#dc2626' : '#16a34a', backgroundColor: '#f0fdf4' }}
+                                >
+                                  {slotData.sold ? '❌' : '✅'} {slotType}: {slotData.sold ? 'Reserved' : 'Available'} - {slotData.code || 'N/A'}
+                                </option>
+                              ))}
+                            </select>
+                          </td>
+                          <td className="px-6 py-4">
+                            <select className="text-sm bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-red-500">
+                              <option value="all">All Slots</option>
+                              {Object.keys(item.codes || {})
+                                .filter(slotType => !slotType.toLowerCase().includes('offline'))
+                                .map(slotType => (
+                                  <option key={slotType} value={slotType}>
+                                    {slotType}: {visibleSlots[slotType] ? 'Visible' : 'Hidden'}
+                                  </option>
+                                ))
+                              }
+                            </select>
+                          </td>
+                          <td className="px-6 py-4 text-gray-900 dark:text-white">
+                            <div className="text-sm">{item.region}</div>
+                          </td>
+                          <td className="px-6 py-4 text-gray-900 dark:text-white">
+                            <div className="text-sm">{item.onlineId}</div>
+                          </td>
+                        </tr>
+                      ))}
+                      {filteredInventory.length === 0 && (
+                        <tr>
+                          <td colSpan={8} className="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
+                            {selectedProductId === 'all' ? 'No inventory items found' : 'No inventory items found for this product'}
                           </td>
                         </tr>
                       )}
@@ -597,8 +827,8 @@ export function ProductDataOverview() {
             onClick={() => setView('product_details')}
             className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${
               view === 'product_details'
-                ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
-                : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+                ? 'bg-red-600 text-white shadow-sm'
+                : 'text-black hover:bg-red-600 hover:text-white'
             }`}
           >
             <div className="flex items-center gap-2">
@@ -610,8 +840,8 @@ export function ProductDataOverview() {
             onClick={() => setView('all_products')}
             className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${
               view === 'all_products'
-                ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
-                : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+                ? 'bg-red-600 text-white shadow-sm'
+                : 'text-black hover:bg-red-600 hover:text-white'
             }`}
           >
             <div className="flex items-center gap-2">
@@ -623,8 +853,8 @@ export function ProductDataOverview() {
             onClick={() => setView('all_customers')}
             className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${
               view === 'all_customers'
-                ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
-                : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+                ? 'bg-red-600 text-white shadow-sm'
+                : 'text-black hover:bg-red-600 hover:text-white'
             }`}
           >
             <div className="flex items-center gap-2">
@@ -636,8 +866,8 @@ export function ProductDataOverview() {
             onClick={() => setView('categories')}
             className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${
               view === 'categories'
-                ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
-                : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+                ? 'bg-red-600 text-white shadow-sm'
+                : 'text-black hover:bg-red-600 hover:text-white'
             }`}
           >
             <div className="flex items-center gap-2">
@@ -649,10 +879,23 @@ export function ProductDataOverview() {
       </div>
 
       {/* Main Content Area */}
-      {view === 'product_details' && renderProductDetails()}
-      {view === 'all_products' && renderAllProducts()}
-      {view === 'all_customers' && renderAllCustomers()}
-      {view === 'categories' && renderCategories()}
+      {(() => {
+        try {
+          if (view === 'product_details') return renderProductDetails();
+          if (view === 'all_products') return renderAllProducts();
+          if (view === 'all_customers') return renderAllCustomers();
+          if (view === 'categories') return renderCategories();
+          return null;
+        } catch (error) {
+          console.error('Error rendering view:', error);
+          return (
+            <div className="p-6 bg-red-50 border border-red-200 rounded-lg">
+              <h3 className="text-red-800 font-semibold mb-2">Error Loading Data</h3>
+              <p className="text-red-600">There was an error loading this view. Please try refreshing the page.</p>
+            </div>
+          );
+        }
+      })()}
     </div>
   );
 }

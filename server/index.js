@@ -1731,6 +1731,84 @@ app.post(`${BASE_PATH}/payment/verify`, async (req, res) => {
     res.status(500).json({ error: 'Failed to verify payment' });
   }
 });
+// Public Categories
+app.get(`${BASE_PATH}/system/categories`, async (req, res) => {
+  try {
+    const [rows] = await pool.query('SELECT * FROM categories WHERE is_active = TRUE ORDER BY display_order ASC');
+    res.json(rows);
+  } catch (error) {
+    console.error('Error fetching categories:', error);
+    res.status(500).json({ error: 'Failed to fetch categories' });
+  }
+});
+
+// Public Products
+app.get(`${BASE_PATH}/public/products`, async (req, res) => {
+  try {
+    const category = req.query.category;
+    const id = req.query.id;
+    let query = 'SELECT * FROM products';
+    const params = [];
+
+    if (id) {
+      query += ' WHERE id = ?';
+      params.push(id);
+    } else if (category && category !== 'All') {
+      query += ' WHERE category_slug = ?';
+      params.push(category.toLowerCase());
+    }
+    
+    // Always sort by stock DESC for public view so available items come first
+    query += ' ORDER BY stock DESC, id DESC';
+
+    const [rows] = await pool.query(query, params);
+
+    // Transform data to match frontend expectations
+    const products = rows.map(product => {
+      let digitalItems = [];
+      let attributes = {};
+
+      try {
+        digitalItems = typeof product.digital_items === 'string'
+          ? JSON.parse(product.digital_items)
+          : (product.digital_items || []);
+      } catch (e) {
+        digitalItems = [];
+      }
+
+      try {
+        attributes = typeof product.attributes === 'string'
+          ? JSON.parse(product.attributes)
+          : (product.attributes || {});
+      } catch (e) {
+        attributes = {};
+      }
+
+      return {
+        id: product.id,
+        name: product.name,
+        description: product.description,
+        price: typeof product.price === 'string' ? parseFloat(product.price.replace('$', '')) : product.price,
+        cost: typeof product.cost === 'string' ? parseFloat(product.cost.replace('$', '')) : (product.cost || 0),
+        stock: product.stock,
+        status: product.stock > 0 ? 'In Stock' : 'Out of Stock',
+        image: product.image,
+        category: product.category_slug ? product.category_slug.charAt(0).toUpperCase() + product.category_slug.slice(1) : 'Games',
+        categorySlug: product.category_slug,
+        subCategory: product.sub_category_slug,
+        attributes,
+        digitalItems,
+        digital_items: digitalItems
+      };
+    });
+
+    res.json({ products });
+  } catch (error) {
+    console.error('Error fetching products:', error);
+    res.status(500).json({ error: 'Failed to fetch products', details: error.message });
+  }
+});
+
 // Products Route
 app.get(`${BASE_PATH}/products`, async (req, res) => {
   try {
@@ -1783,7 +1861,8 @@ app.get(`${BASE_PATH}/products`, async (req, res) => {
         categorySlug: product.category_slug,
         subCategory: product.sub_category_slug,
         attributes,
-        digitalItems
+        digitalItems,
+        digital_items: digitalItems // Include both for compatibility
       };
     });
 
@@ -2758,13 +2837,14 @@ app.get(`${BASE_PATH}/admin/product-overview`, async (req, res) => {
 
     // 3. Get Sold Items (from orders)
     // We search by product name since orders store product_name
+    // Using LIKE to match product names that might have attributes appended e.g. "Product (Primary ps5)"
     const [orderRows] = await pool.query(`
       SELECT id, order_number, customer_name, customer_email, date, 
              digital_email, digital_password, digital_code 
       FROM orders 
-      WHERE product_name = ? 
+      WHERE product_name LIKE ? OR product_name = ?
       ORDER BY date DESC
-    `, [product.name]);
+    `, [`${product.name} %`, product.name]);
 
     const soldItems = orderRows.map(row => ({
       orderId: row.id,
@@ -2887,6 +2967,112 @@ app.delete(`${BASE_PATH}/admin/users/:id`, async (req, res) => {
 
 // Removed duplicate customer-orders POST handler that was conflicting with the main implementation
 
+
+// Get Analytics Data (Admin)
+app.get(`${BASE_PATH}/admin/analytics`, async (req, res) => {
+  try {
+    const { timeRange } = req.query;
+    
+    // Calculate date range
+    const now = new Date();
+    let startDate = new Date();
+    
+    switch(timeRange) {
+      case '7days':
+        startDate.setDate(now.getDate() - 7);
+        break;
+      case '30days':
+        startDate.setDate(now.getDate() - 30);
+        break;
+      case '3months':
+        startDate.setMonth(now.getMonth() - 3);
+        break;
+      case '12months':
+      default:
+        startDate.setMonth(now.getMonth() - 12);
+        break;
+    }
+
+    // 1. Revenue & Profit Data (Grouped by Month or Day)
+    // For simplicity, we assume profit is (price - cost)
+    // We need to join with products table to get cost
+    // Note: orders table has amount (revenue) but not cost directly. 
+    // We can join with products on product_name (approximate)
+    
+    // Group format: '%Y-%m' for months, '%Y-%m-%d' for days
+    const groupBy = (timeRange === '7days' || timeRange === '30days') ? '%Y-%m-%d' : '%Y-%m';
+    const labelFormat = (timeRange === '7days' || timeRange === '30days') ? '%d %b' : '%b';
+    
+    const [revenueRows] = await pool.query(`
+      SELECT 
+        DATE_FORMAT(o.date, ?) as date_label,
+        SUM(o.amount) as revenue,
+        COUNT(o.id) as orders_count,
+        SUM(o.amount - COALESCE(p.cost, 0)) as profit
+      FROM orders o
+      LEFT JOIN products p ON o.product_name = p.name OR o.product_name LIKE CONCAT(p.name, ' (%')
+      WHERE o.date >= ?
+      GROUP BY date_label
+      ORDER BY o.date ASC
+    `, [groupBy, startDate]);
+
+    // Fill in missing dates? For now, just return what we have
+    const revenueData = revenueRows.map(row => ({
+      month: row.date_label, // using 'month' key for frontend compatibility
+      revenue: parseFloat(row.revenue || 0),
+      orders: row.orders_count,
+      profit: parseFloat(row.profit || 0)
+    }));
+
+    // 2. Revenue by Category
+    const [categoryRows] = await pool.query(`
+      SELECT 
+        COALESCE(p.category_slug, 'Uncategorized') as category,
+        SUM(o.amount) as value
+      FROM orders o
+      LEFT JOIN products p ON o.product_name = p.name OR o.product_name LIKE CONCAT(p.name, ' (%')
+      WHERE o.date >= ?
+      GROUP BY category
+    `, [startDate]);
+
+    const totalRevenue = categoryRows.reduce((sum, row) => sum + parseFloat(row.value), 0);
+    const categoryData = categoryRows.map((row, index) => {
+      // Define colors
+      const colors = ['#DC2626', '#EF4444', '#F87171', '#FCA5A5', '#FECACA', '#FEE2E2'];
+      return {
+        name: row.category.charAt(0).toUpperCase() + row.category.slice(1),
+        value: totalRevenue > 0 ? Math.round((parseFloat(row.value) / totalRevenue) * 100) : 0,
+        raw_value: parseFloat(row.value),
+        color: colors[index % colors.length]
+      };
+    });
+
+    // 3. Totals
+    const totalStats = {
+      revenue: revenueData.reduce((acc, curr) => acc + curr.revenue, 0),
+      profit: revenueData.reduce((acc, curr) => acc + curr.profit, 0),
+      orders: revenueData.reduce((acc, curr) => acc + curr.orders, 0)
+    };
+    totalStats.avgOrderValue = totalStats.orders > 0 ? totalStats.revenue / totalStats.orders : 0;
+
+    // 4. Top Regions (Mock for now as we don't track region in orders well enough yet)
+    // But we can try to extract from shipping_address if available
+    const topRegions = [
+      { region: 'Global', revenue: totalStats.revenue, growth: 0, flag: '🌍' }
+    ];
+
+    res.json({
+      revenueData,
+      categoryData,
+      topRegions,
+      totals: totalStats
+    });
+
+  } catch (error) {
+    console.error('Error fetching analytics:', error);
+    res.status(500).json({ error: 'Failed to fetch analytics', details: error.message });
+  }
+});
 
 // Get Customers (Admin)
 app.get(`${BASE_PATH}/admin/customers`, async (req, res) => {

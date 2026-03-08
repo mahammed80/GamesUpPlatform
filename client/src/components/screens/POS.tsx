@@ -52,7 +52,7 @@ export function POS() {
 
   async function loadProducts() {
     try {
-      const data = await productsAPI.getAll();
+      const data = await productsAPI.getPublic();
       setProducts(data.products || []);
     } catch (error) {
       console.error('Error loading products:', error);

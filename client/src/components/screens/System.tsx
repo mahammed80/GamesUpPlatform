@@ -593,8 +593,8 @@ export function System() {
           onClick={() => setActiveTab('categories')}
           className={`px-4 py-3 font-medium text-sm flex items-center gap-2 border-b-2 transition-colors ${
             activeTab === 'categories'
-              ? 'border-red-600 text-red-600 dark:text-red-400'
-              : 'border-transparent text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+              ? 'border-red-600 text-white'
+              : 'border-transparent text-white hover:text-red-300'
           }`}
         >
           <Tag className="w-4 h-4" />
@@ -604,8 +604,8 @@ export function System() {
           onClick={() => setActiveTab('subcategories')}
           className={`px-4 py-3 font-medium text-sm flex items-center gap-2 border-b-2 transition-colors ${
             activeTab === 'subcategories'
-              ? 'border-red-600 text-red-600 dark:text-red-400'
-              : 'border-transparent text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+              ? 'border-red-600 text-white'
+              : 'border-transparent text-white hover:text-red-300'
           }`}
         >
           <FolderTree className="w-4 h-4" />
@@ -615,8 +615,8 @@ export function System() {
           onClick={() => setActiveTab('attributes')}
           className={`px-4 py-3 font-medium text-sm flex items-center gap-2 border-b-2 transition-colors ${
             activeTab === 'attributes'
-              ? 'border-red-600 text-red-600 dark:text-red-400'
-              : 'border-transparent text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+              ? 'border-red-600 text-white'
+              : 'border-transparent text-white hover:text-red-300'
           }`}
         >
           <SettingsIcon className="w-4 h-4" />

@@ -296,7 +296,9 @@ export function ProductDetails({ onOpenCart, productId }: ProductDetailsProps) {
                   <div className="mb-8">
                     <h3 className="text-sm font-medium text-gray-900 mb-3">Select Version</h3>
                     <div className="flex flex-wrap gap-3">
-                      {Object.entries(availableAttributes).map(([attr, count]) => (
+                      {Object.entries(availableAttributes)
+                        .filter(([attr]) => !attr.toLowerCase().includes('offline'))
+                        .map(([attr, count]) => (
                         <button
                           key={attr}
                           onClick={() => setSelectedAttribute(attr)}

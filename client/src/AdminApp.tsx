@@ -38,10 +38,13 @@ export default function AdminApp() {
 
   useEffect(() => {
     localStorage.setItem('theme', isDarkMode ? 'dark' : 'light');
+    console.log('Theme changed to:', isDarkMode ? 'dark' : 'light');
     if (isDarkMode) {
       document.documentElement.classList.add('dark');
+      console.log('Added dark class to document element');
     } else {
       document.documentElement.classList.remove('dark');
+      console.log('Removed dark class from document element');
     }
   }, [isDarkMode]);
 

@@ -218,16 +218,16 @@ export function Login({ onLogin }: LoginProps) {
 
           {!isSignup && (
             <div className="mt-6 p-4 bg-red-50 rounded-lg border border-red-200">
-              <p className="text-xs text-red-800 font-semibold mb-2">Demo Admin Credentials:</p>
+              <p className="text-xs text-red-800 font-semibold mb-2">Admin Credentials:</p>
               <div className="space-y-1">
                 <p className="text-sm text-red-700 font-mono">Email: admin@gamesup.com</p>
-                <p className="text-sm text-red-700 font-mono">Password: admin123</p>
+                <p className="text-sm text-red-700 font-mono">Password: AdminPassword2025!</p>
               </div>
               <button
                 type="button"
                 onClick={() => {
                   setEmail('admin@gamesup.com');
-                  setPassword('admin123');
+                  setPassword('AdminPassword2025!');
                 }}
                 className="mt-3 text-xs text-red-600 hover:text-red-700 font-semibold underline"
               >

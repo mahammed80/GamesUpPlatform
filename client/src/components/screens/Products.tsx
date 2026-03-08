@@ -1,156 +1,41 @@
-import { useState, useEffect } from 'react';
-import { Search, Plus, Edit, Trash2, Filter } from 'lucide-react';
-import { Card } from '../ui/card';
-import { Button } from '../ui/button';
-import { Modal } from '../ui/Modal';
-import { productsAPI, BASE_URL } from '../../utils/api';
-import { useStoreSettings } from '../../context/StoreSettingsContext';
+import React, { useState, useEffect } from 'react';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { Modal } from '@/components/ui/Modal';
+import { Search, Plus, Edit2, Trash2 } from 'lucide-react';
+import { useStoreSettings } from '@/context/StoreSettingsContext';
+import { productsAPI, BASE_URL } from '@/utils/api';
 
 interface Product {
   id: string | number;
   name: string;
   category: string;
-  categorySlug?: string;
-  subCategory?: string;
   price: number;
   cost?: number;
   stock: number;
   status: string;
   image: string;
+  subCategory?: string;
   attributes?: Record<string, any>;
+  digitalItems?: DigitalItem[];
   purchasedEmail?: string;
   purchasedPassword?: string;
   productCode?: string;
-  digitalItems?: {
-    email?: string;
-    password?: string;
-    code?: string;
-    outlookEmail?: string;
-    outlookPassword?: string;
-    birthdate?: string;
-    region?: string;
-    onlineId?: string;
-    backupCodes?: string;
-    slots?: Record<string, { sold: boolean; orderId: string | null }>;
-  }[];
 }
 
-const QuickEditCell = ({ value, onSave, type = "text", prefix = "", options }: { value: string | number, onSave: (val: string | number) => void, type?: string, prefix?: string, options?: string[] }) => {
-  const [isEditing, setIsEditing] = useState(false);
-  const [currentValue, setCurrentValue] = useState(value);
-
-  useEffect(() => {
-    setCurrentValue(value);
-  }, [value]);
-
-  const handleBlur = () => {
-    setIsEditing(false);
-    if (currentValue != value) {
-      onSave(currentValue);
-    }
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      handleBlur();
-    }
-  };
-
-  if (isEditing) {
-    if (options) {
-      return (
-        <select
-          autoFocus
-          value={currentValue}
-          onChange={(e) => setCurrentValue(e.target.value)}
-          onBlur={handleBlur}
-          onKeyDown={handleKeyDown}
-          className="w-full min-w-[80px] px-2 py-1 bg-white dark:bg-gray-800 border border-blue-500 rounded text-gray-900 dark:text-white"
-          onClick={(e) => e.stopPropagation()}
-        >
-          {options.map(opt => (
-            <option key={opt} value={opt}>{opt}</option>
-          ))}
-        </select>
-      );
-    }
-    return (
-        <input
-          autoFocus
-          type={type}
-          value={currentValue}
-          onChange={(e) => setCurrentValue(e.target.value)}
-          onBlur={handleBlur}
-          onKeyDown={handleKeyDown}
-          className="w-full min-w-[80px] px-2 py-1 bg-white dark:bg-gray-800 border border-blue-500 rounded text-gray-900 dark:text-white"
-          onClick={(e) => e.stopPropagation()}
-        />
-    );
-  }
-
-  return (
-    <div onClick={(e) => { e.stopPropagation(); setIsEditing(true); }} className="cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 p-1 rounded border border-transparent hover:border-gray-300 transition-all">
-      {prefix}{value}
-    </div>
-  );
-};
-
-const initialProducts: Product[] = [
-  {
-    id: 1,
-    name: 'PlayStation 5 Console',
-    category: 'Consoles',
-    price: '499.99',
-    stock: 124,
-    status: 'In Stock',
-    image: 'https://images.unsplash.com/photo-1606813907291-d86efa9b94db?w=100&h=100&fit=crop',
-  },
-  {
-    id: 2,
-    name: 'DualSense Controller',
-    category: 'Accessories',
-    price: '69.99',
-    stock: 456,
-    status: 'In Stock',
-    image: 'https://images.unsplash.com/photo-1592840496694-26d035b52b48?w=100&h=100&fit=crop',
-  },
-  {
-    id: 3,
-    name: 'PS5 VR Headset',
-    category: 'Accessories',
-    price: '549.99',
-    stock: 8,
-    status: 'Low Stock',
-    image: 'https://images.unsplash.com/photo-1617802690658-1173a812650d?w=100&h=100&fit=crop',
-  },
-  {
-    id: 4,
-    name: 'God of War Ragnarök',
-    category: 'Games',
-    price: '69.99',
-    stock: 234,
-    status: 'In Stock',
-    image: 'https://images.unsplash.com/photo-1509198397868-475647b2a1e5?w=100&h=100&fit=crop',
-  },
-  {
-    id: 5,
-    name: 'Spider-Man 2',
-    category: 'Games',
-    price: '69.99',
-    stock: 189,
-    status: 'In Stock',
-    image: 'https://images.unsplash.com/photo-1550745165-9bc0b252726f?w=100&h=100&fit=crop',
-  },
-  {
-    id: 6,
-    name: 'PlayStation Plus 12-Month',
-    category: 'Services',
-    price: '59.99',
-    stock: 999,
-    status: 'In Stock',
-    image: 'https://images.unsplash.com/photo-1511512578047-dfb367046420?w=100&h=100&fit=crop',
-  },
-];
+interface DigitalItem {
+  email: string;
+  password: string;
+  code: string;
+  outlookEmail?: string;
+  outlookPassword?: string;
+  birthdate?: string;
+  region?: string;
+  onlineId?: string;
+  backupCodes?: string;
+  slots?: Record<string, { sold: boolean; orderId: string | null; code?: string }>;
+  totalCodes?: number;
+}
 
 export function Products() {
   const { settings, formatPrice } = useStoreSettings();
@@ -177,7 +62,6 @@ export function Products() {
     digitalItems: [] as Product['digitalItems'],
   });
 
-  // Temp state for adding new digital item
   const [newItem, setNewItem] = useState({ 
     email: '', 
     password: '', 
@@ -196,7 +80,9 @@ export function Products() {
 
   const loadData = async () => {
     try {
+        console.log('Loading data...');
         setLoading(true);
+        
         const [catsRes, subCatsRes, attrsRes, productsRes] = await Promise.all([
             fetch(`${BASE_URL}/system/categories`),
             fetch(`${BASE_URL}/system/subcategories`),
@@ -204,28 +90,58 @@ export function Products() {
             productsAPI.getAll()
         ]);
 
+        console.log('API responses:', { catsRes, subCatsRes, attrsRes, productsRes });
+
+        // Handle categories
         if (catsRes.ok) {
             const data = await catsRes.json();
+            console.log('Categories data:', data);
             setCategories(data);
             if (data.length > 0 && !formData.category) {
                  setFormData(prev => ({ ...prev, category: data[0].name }));
             }
+        } else {
+            console.error('Categories API failed:', catsRes.status);
+            setCategories([]);
         }
-        if (subCatsRes.ok) setSubCategories(await subCatsRes.json());
-        if (attrsRes.ok) setAttributes(await attrsRes.json());
         
-        setProducts(productsRes.products);
+        // Handle subcategories
+        if (subCatsRes.ok) {
+            const subData = await subCatsRes.json();
+            console.log('Subcategories data:', subData);
+            setSubCategories(subData);
+        } else {
+            console.error('Subcategories API failed:', subCatsRes.status);
+            setSubCategories([]);
+        }
+        
+        // Handle attributes
+        if (attrsRes.ok) {
+            const attrsData = await attrsRes.json();
+            console.log('Attributes data:', attrsData);
+            setAttributes(attrsData);
+        } else {
+            console.error('Attributes API failed:', attrsRes.status);
+            setAttributes([]);
+        }
+        
+        console.log('Products response:', productsRes);
+        setProducts(productsRes.products || []);
         setError(null);
     } catch (err: any) {
         console.error("Failed to load data", err);
-        setError(err.message || 'Failed to load data');
+        console.error('Error details:', {
+            message: err?.message,
+            stack: err?.stack,
+            name: err?.name
+        });
+        setError(err?.message || 'Failed to load data');
     } finally {
         setLoading(false);
     }
   };
 
   async function loadProducts() {
-     // Re-fetch only products if needed, but usually we just reload everything or optimistically update
      try {
        const data = await productsAPI.getAll();
        setProducts(data.products);
@@ -233,35 +149,6 @@ export function Products() {
        console.error(err);
      }
   }
-
-  const handleQuickUpdate = async (id: string | number, field: string, value: any, isAttribute = false) => {
-    try {
-        const product = products.find(p => p.id === id);
-        if (!product) return;
-
-        let updatedProduct;
-        if (isAttribute) {
-            updatedProduct = {
-                ...product,
-                attributes: {
-                    ...(product.attributes || {}),
-                    [field]: value
-                }
-            };
-        } else {
-            updatedProduct = { ...product, [field]: value };
-        }
-
-        // Optimistic update
-        setProducts(products.map(p => p.id === id ? updatedProduct : p));
-
-        await productsAPI.update(id, updatedProduct);
-    } catch (error) {
-        console.error('Error updating product:', error);
-        // Revert or show error (simplest is to reload)
-        loadProducts();
-    }
-  };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -289,18 +176,36 @@ export function Products() {
   const handleAddDigitalItem = () => {
     if (!newItem.email && !newItem.password && !newItem.code) return;
     
+    const codes = newItem.code
+      .split('\n')
+      .map(code => code.trim())
+      .filter(code => code.length > 0);
+
+    if (codes.length === 0) return;
+
+    const mainCodes = codes.slice(0, 5);
+    const backupCodes = codes.slice(5);
+    
     const slots = {
-        'Ps4 Primary': { sold: false, orderId: null },
-        'Ps5 Primary': { sold: false, orderId: null },
-        'Secondary': { sold: false, orderId: null },
-        'Ps4 Offline': { sold: false, orderId: null },
-        'Ps5 Offline': { sold: false, orderId: null }
+      'Primary ps4': { sold: false, orderId: null, code: mainCodes[0] || '' },
+      'Primary ps5': { sold: false, orderId: null, code: mainCodes[1] || '' },
+      'Secondary': { sold: false, orderId: null, code: mainCodes[2] || '' },
+      'Offline ps4': { sold: false, orderId: null, code: mainCodes[3] || '' },
+      'Offline ps5': { sold: false, orderId: null, code: mainCodes[4] || '' }
+    };
+
+    const newItemData = {
+      ...newItem,
+      code: mainCodes[0] || '',
+      slots,
+      backupCodes: backupCodes.join('\n'),
+      totalCodes: codes.length
     };
 
     setFormData(prev => ({
       ...prev,
-      digitalItems: [...(prev.digitalItems || []), { ...newItem, slots }],
-      stock: prev.stock + 5 // Each account provides 5 slots
+      digitalItems: [...(Array.isArray(prev.digitalItems) ? prev.digitalItems : []), newItemData],
+      stock: prev.stock + 5
     }));
     setNewItem({ email: '', password: '', code: '', outlookEmail: '', outlookPassword: '', birthdate: '', region: '', onlineId: '', backupCodes: '' });
   };
@@ -311,7 +216,7 @@ export function Products() {
         const slotsCount = item?.slots ? 5 : 1;
         return {
             ...prev,
-            digitalItems: (prev.digitalItems || []).filter((_, i) => i !== index),
+            digitalItems: (Array.isArray(prev.digitalItems) ? prev.digitalItems : []).filter((_, i) => i !== index),
             stock: Math.max(0, prev.stock - slotsCount)
         };
     });
@@ -339,19 +244,14 @@ export function Products() {
       const lines = text.split('\n');
       const newItems: Product['digitalItems'] = [];
 
-      // Skip header (index 0)
       for (let i = 1; i < lines.length; i++) {
         const line = lines[i].trim();
         if (!line) continue;
         
-        // CSV Format: Email,Password,Code,OutlookEmail,OutlookPassword,Birthdate,Region,OnlineID,BackupCodes
         const parts = line.split(',').map(item => item.trim());
         const [email, password, code, outlookEmail, outlookPassword, birthdate, region, onlineId, ...rest] = parts;
         
-        // Backup codes might contain commas if quoted, but for simplicity assume simple CSV or last field captures rest
-        // If backup codes are newline separated inside a cell, standard CSV split might break.
-        // But let's assume simple comma separation for now as per "12 rows of code column" -> likely a text block.
-        const backupCodes = rest.join(','); // Join remaining parts as backup codes if any
+        const backupCodes = rest.join(',');
 
         if (email || password || code) {
           newItems.push({
@@ -365,11 +265,11 @@ export function Products() {
             onlineId,
             backupCodes,
             slots: {
-                'Ps4 Primary': { sold: false, orderId: null },
-                'Ps5 Primary': { sold: false, orderId: null },
+                'Primary ps4': { sold: false, orderId: null },
+                'Primary ps5': { sold: false, orderId: null },
                 'Secondary': { sold: false, orderId: null },
-                'Ps4 Offline': { sold: false, orderId: null },
-                'Ps5 Offline': { sold: false, orderId: null }
+                'Offline ps4': { sold: false, orderId: null },
+                'Offline ps5': { sold: false, orderId: null }
             }
           });
         }
@@ -377,12 +277,11 @@ export function Products() {
 
       setFormData(prev => ({
         ...prev,
-        digitalItems: [...(prev.digitalItems || []), ...newItems],
+        digitalItems: [...(Array.isArray(prev.digitalItems) ? prev.digitalItems : []), ...newItems],
         stock: prev.stock + (newItems.length * 5)
       }));
     };
     reader.readAsText(file);
-    // Reset input
     e.target.value = '';
   };
 
@@ -447,498 +346,497 @@ export function Products() {
     return matchesSearch && matchesCategory;
   });
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-96">
-        <div className="text-gray-500 dark:text-gray-400">Loading products...</div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="flex flex-col items-center justify-center h-96 space-y-4">
-        <div className="text-red-600 dark:text-red-400">{error}</div>
-        <Button onClick={loadProducts}>Try Again</Button>
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Products</h1>
-          <p className="text-sm text-gray-500 dark:text-gray-400">Manage your product inventory</p>
-        </div>
-        <Button
-          onClick={() => {
-            setEditingProduct(null);
-            setFormData({ name: '', category: categories[0]?.name || '', price: '', cost: '', stock: 0, image: '', digitalItems: [] });
-            setNewItem({ email: '', password: '', code: '' });
-            setIsAddModalOpen(true);
-          }}
-          icon={Plus}
-        >
-          Add Product
-        </Button>
-      </div>
-
-      {/* Filters */}
-      <Card className="p-8">
-        <div className="flex flex-col md:flex-row gap-4">
-          <div className="flex-1 relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Search products..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-sm text-gray-900 dark:text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-red-500"
-            />
+  const renderContent = () => {
+    try {
+      if (loading) {
+        return (
+          <div className="flex items-center justify-center h-96">
+            <div className="text-gray-500 dark:text-gray-400">Loading products...</div>
           </div>
-          <select
-            value={categoryFilter}
-            onChange={(e) => setCategoryFilter(e.target.value)}
-            className="px-4 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            <option>All</option>
-            {categories.map(c => (
-                <option key={c.id} value={c.name}>{c.name}</option>
-            ))}
-          </select>
-        </div>
-      </Card>
+        );
+      }
 
-      {/* Products Table */}
-      <Card className="p-8">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-gray-200 dark:border-gray-700">
-                <th className="text-left py-3 px-4 text-sm font-medium text-gray-500 dark:text-gray-400">Product</th>
-                <th className="text-left py-3 px-4 text-sm font-medium text-gray-500 dark:text-gray-400">Category</th>
-                <th className="text-left py-3 px-4 text-sm font-medium text-gray-500 dark:text-gray-400">Sub Category</th>
-                {attributes.filter(a => a.isActive).map(attr => (
-                  <th key={attr.id} className="text-left py-3 px-4 text-sm font-medium text-gray-500 dark:text-gray-400">{attr.name}</th>
-                ))}
-                <th className="text-left py-3 px-4 text-sm font-medium text-gray-500 dark:text-gray-400">Price</th>
-                <th className="text-left py-3 px-4 text-sm font-medium text-gray-500 dark:text-gray-400">Cost</th>
-                <th className="text-left py-3 px-4 text-sm font-medium text-gray-500 dark:text-gray-400">Stock</th>
-                <th className="text-left py-3 px-4 text-sm font-medium text-gray-500 dark:text-gray-400">Status</th>
-                <th className="text-right py-3 px-4 text-sm font-medium text-gray-500 dark:text-gray-400">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredProducts.map((product) => (
-                <tr
-                  key={product.id}
-                  className="border-b border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
-                >
-                  <td className="py-4 px-4">
-                    <div className="flex items-center gap-3">
-                      <img src={product.image} alt={product.name} className="w-12 h-12 rounded-lg object-cover" />
-                      <div className="font-medium text-gray-900 dark:text-white">
-                        <QuickEditCell value={product.name} onSave={(val) => handleQuickUpdate(product.id, 'name', val)} />
-                      </div>
-                    </div>
-                  </td>
-                  <td className="py-4 px-4 text-sm text-gray-600 dark:text-gray-300">
-                    <QuickEditCell 
-                        value={product.category} 
-                        onSave={(val) => handleQuickUpdate(product.id, 'category', val)}
-                        options={categories.map(c => c.name)}
-                    />
-                  </td>
-                  <td className="py-4 px-4 text-sm text-gray-600 dark:text-gray-300">
-                    <QuickEditCell 
-                        value={product.subCategory || ''} 
-                        onSave={(val) => handleQuickUpdate(product.id, 'subCategory', val)}
-                        options={(() => {
-                            const cat = categories.find(c => c.slug === product.categorySlug || c.name === product.category);
-                            return cat ? subCategories.filter(s => s.categoryId === cat.id && s.isActive).map(s => s.name) : [];
-                        })()}
-                    />
-                  </td>
-                  {attributes.filter(a => a.isActive).map(attr => (
-                    <td key={attr.id} className="py-4 px-4 text-sm text-gray-600 dark:text-gray-300">
-                        <QuickEditCell
-                            value={product.attributes?.[attr.name] || ''}
-                            onSave={(val) => handleQuickUpdate(product.id, attr.name, val, true)}
-                            options={attr.options && attr.options.length > 0 ? attr.options : undefined}
-                            type={attr.type === 'number' ? 'number' : 'text'}
-                        />
-                    </td>
-                  ))}
-                  <td className="py-4 px-4 text-sm font-medium text-gray-900 dark:text-white">
-                    <QuickEditCell 
-                        value={product.price} 
-                        onSave={(val) => handleQuickUpdate(product.id, 'price', parseFloat(val as string))} 
-                        prefix={settings.currency_symbol}
-                        type="number"
-                    />
-                  </td>
-                  <td className="py-4 px-4 text-sm font-medium text-gray-500 dark:text-gray-400">
-                    <QuickEditCell 
-                        value={product.cost || 0} 
-                        onSave={(val) => handleQuickUpdate(product.id, 'cost', parseFloat(val as string))} 
-                        prefix={settings.currency_symbol}
-                        type="number"
-                    />
-                  </td>
-                  <td className="py-4 px-4 text-sm text-gray-600 dark:text-gray-300">
-                    <QuickEditCell 
-                        value={product.stock} 
-                        onSave={(val) => handleQuickUpdate(product.id, 'stock', parseInt(val as string))} 
-                        type="number"
-                    />
-                  </td>
-                  <td className="py-4 px-4">
-                    <span
-                      className={`px-2 py-1 rounded-full text-xs font-medium ${
-                        product.status === 'In Stock'
-                          ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400'
-                          : 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400'
-                      }`}
-                    >
-                      {product.status}
-                    </span>
-                  </td>
-                  <td className="py-4 px-4">
-                    <div className="flex items-center justify-end gap-2">
-                      <button
-                        onClick={() => handleEditProduct(product)}
-                        className="p-2 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors"
-                      >
-                        <Edit className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => handleDeleteProduct(product.id)}
-                        className="p-2 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </Card>
-
-      {/* Add/Edit Product Modal */}
-      <Modal
-        isOpen={isAddModalOpen}
-        onClose={() => {
-          setIsAddModalOpen(false);
-          setEditingProduct(null);
-          setFormData({ name: '', category: categories[0]?.name || '', price: '', cost: '', stock: 0, image: '', digitalItems: [] });
-        }}
-        title={editingProduct ? 'Edit Product' : 'Add New Product'}
-      >
-        <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Product Name</label>
-            <input
-              type="text"
-              value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              className="w-full px-4 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-red-500"
-              placeholder="Enter product name"
-            />
+      if (error) {
+        return (
+          <div className="flex flex-col items-center justify-center h-96 space-y-4">
+            <div className="text-red-600 dark:text-red-400">{error}</div>
+            <Button onClick={loadData}>Try Again</Button>
           </div>
-          
-          <div className="grid grid-cols-2 gap-4">
+        );
+      }
+
+      return (
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Category</label>
+              <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Products</h1>
+              <p className="text-sm text-gray-500 dark:text-gray-400">Manage your product inventory</p>
+            </div>
+            <Button
+              onClick={() => {
+                setEditingProduct(null);
+                setFormData({ name: '', category: categories[0]?.name || '', price: '', cost: '', stock: 0, image: '', digitalItems: [] });
+                setNewItem({ email: '', password: '', code: '' });
+                setIsAddModalOpen(true);
+              }}
+              icon={Plus}
+            >
+              Add Product
+            </Button>
+          </div>
+
+          <Card className="p-8">
+            <div className="flex flex-col md:flex-row gap-4">
+              <div className="flex-1 relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Search products..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-sm text-gray-900 dark:text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-red-500"
+                />
+              </div>
               <select
-                value={formData.category}
-                onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                className="w-full px-4 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-red-500"
+                value={categoryFilter}
+                onChange={(e) => setCategoryFilter(e.target.value)}
+                className="px-4 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
+                <option>All</option>
                 {categories.map(c => (
                     <option key={c.id} value={c.name}>{c.name}</option>
                 ))}
               </select>
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Sub Category</label>
-              <select
-                value={formData.subCategory}
-                onChange={(e) => setFormData({ ...formData, subCategory: e.target.value })}
-                className="w-full px-4 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-red-500"
-              >
-                <option value="">Select Sub Category</option>
-                {(() => {
-                    const cat = categories.find(c => c.name === formData.category);
-                    return cat ? subCategories.filter(s => s.categoryId === cat.id && s.isActive).map(s => (
-                        <option key={s.id} value={s.name}>{s.name}</option>
-                    )) : [];
-                })()}
-              </select>
-            </div>
+          </Card>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {filteredProducts.map((product) => (
+              <Card key={product.id} className="overflow-hidden hover:shadow-lg transition-shadow">
+                <div className="aspect-square bg-gray-100 dark:bg-gray-800 relative">
+                  <img
+                    src={product.image}
+                    alt={product.name}
+                    className="w-full h-full object-cover"
+                  />
+                  <div className="absolute top-2 right-2">
+                    <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+                      product.status === 'In Stock' 
+                        ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
+                        : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'
+                    }`}>
+                      {product.status}
+                    </span>
+                  </div>
+                </div>
+                <div className="p-4">
+                  <h3 className="font-semibold text-gray-900 dark:text-white truncate">{product.name}</h3>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">{product.category}</p>
+                  <div className="mt-2 flex items-center justify-between">
+                    <span className="text-lg font-bold text-red-600 dark:text-red-400">{formatPrice(product.price)}</span>
+                    <span className="text-sm text-gray-500 dark:text-gray-400">Stock: {product.stock}</span>
+                  </div>
+                  <div className="mt-4 flex gap-2">
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => handleEditProduct(product)}
+                      className="flex-1"
+                    >
+                      <Edit2 className="w-4 h-4 mr-1" />
+                      Edit
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => handleDeleteProduct(product.id)}
+                      className="text-white hover:text-white hover:bg-red-600 dark:hover:bg-red-600 bg-red-600"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
+              </Card>
+            ))}
           </div>
 
-          {attributes.filter(a => a.isActive).length > 0 && (
-            <div className="grid grid-cols-2 gap-4">
-                {attributes.filter(a => a.isActive).map(attr => (
-                    <div key={attr.id}>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">{attr.name}</label>
-                        {attr.options && attr.options.length > 0 ? (
-                            <select
-                                value={formData.attributes?.[attr.name] || ''}
-                                onChange={(e) => setFormData({ ...formData, attributes: { ...formData.attributes, [attr.name]: e.target.value } })}
-                                className="w-full px-4 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-red-500"
-                            >
-                                <option value="">Select {attr.name}</option>
-                                {attr.options.map((opt: string) => (
-                                    <option key={opt} value={opt}>{opt}</option>
-                                ))}
-                            </select>
-                        ) : (
-                            <input
-                                type={attr.type === 'number' ? 'number' : 'text'}
-                                value={formData.attributes?.[attr.name] || ''}
-                                onChange={(e) => setFormData({ ...formData, attributes: { ...formData.attributes, [attr.name]: e.target.value } })}
-                                className="w-full px-4 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-red-500"
-                                placeholder={`Enter ${attr.name}`}
-                            />
-                        )}
-                    </div>
-                ))}
-            </div>
-          )}
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Price ({settings.currency_symbol})</label>
-              <input
-                type="number"
-                step="0.01"
-                value={formData.price}
-                onChange={(e) => setFormData({ ...formData, price: parseFloat(e.target.value) || 0 })}
-                className="w-full px-4 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-red-500"
-                placeholder="0.00"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Cost ({settings.currency_symbol})</label>
-              <input
-                type="number"
-                step="0.01"
-                value={formData.cost}
-                onChange={(e) => setFormData({ ...formData, cost: parseFloat(e.target.value) || 0 })}
-                className="w-full px-4 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-red-500"
-                placeholder="0.00"
-              />
-            </div>
-          </div>
-          
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Stock Quantity</label>
-            <input
-              type="number"
-              value={formData.stock}
-              onChange={(e) => setFormData({ ...formData, stock: parseInt(e.target.value) || 0 })}
-              disabled={formData.digitalItems.length > 0}
-              className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 ${
-                formData.digitalItems.length > 0 
-                  ? 'bg-gray-100 dark:bg-gray-800 text-gray-500 cursor-not-allowed border-gray-200 dark:border-gray-700' 
-                  : 'bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white border-gray-200 dark:border-gray-600'
-              }`}
-              placeholder="0"
-            />
-            {formData.digitalItems.length > 0 && (
-              <p className="mt-1 text-xs text-blue-600 dark:text-blue-400">
-                Stock is automatically calculated from the number of digital items.
-              </p>
-            )}
-          </div>
-          
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Image URL (optional)</label>
-            <div className="space-y-2">
-              <input
-                type="text"
-                value={formData.image}
-                onChange={(e) => setFormData({ ...formData, image: e.target.value })}
-                className="w-full px-4 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-red-500"
-                placeholder="https://..."
-              />
-              <div className="flex items-center gap-2">
-                <div className="h-px bg-gray-200 dark:bg-gray-700 flex-1"></div>
-                <span className="text-xs text-gray-500 dark:text-gray-400 font-medium">OR UPLOAD</span>
-                <div className="h-px bg-gray-200 dark:bg-gray-700 flex-1"></div>
-              </div>
-              <input
-                type="file"
-                accept="image/*"
-                onChange={handleFileUpload}
-                className="w-full text-sm text-gray-500 dark:text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-red-50 file:text-red-700 hover:file:bg-red-100 dark:file:bg-red-900/30 dark:file:text-red-400"
-              />
-            </div>
-          </div>
-
-          {/* Admin-Only Fields Section */}
-          <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-2">
-                <span className="px-2 py-0.5 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 text-xs rounded">Admin Only</span>
-                Digital Stock Items
-              </h3>
-              <div className="flex gap-2">
-                <Button variant="secondary" onClick={handleExportCSVTemplate} className="text-xs py-1 h-8 dark:text-white">
-                  Download Template
-                </Button>
-                <label className="cursor-pointer">
-                  <span className="inline-flex items-center justify-center px-3 py-1 text-xs font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors h-8">
-                    Import CSV
-                  </span>
-                  <input type="file" accept=".csv" onChange={handleImportCSV} className="hidden" />
-                </label>
-              </div>
-            </div>
-            
-            {/* Add New Item Form */}
-            <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg mb-4">
-              <div className="grid grid-cols-2 gap-3 mb-3">
-                <input
-                  type="email"
-                  value={newItem.email}
-                  onChange={(e) => setNewItem({ ...newItem, email: e.target.value })}
-                  className="w-full px-3 py-2 text-sm bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
-                  placeholder="Email"
-                />
+          <Modal
+            isOpen={isAddModalOpen}
+            onClose={() => {
+              setIsAddModalOpen(false);
+              setEditingProduct(null);
+              setFormData({ name: '', category: categories[0]?.name || '', price: '', cost: '', stock: 0, image: '', digitalItems: [] });
+            }}
+            title={editingProduct ? 'Edit Product' : 'Add New Product'}
+          >
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Product Name</label>
                 <input
                   type="text"
-                  value={newItem.password}
-                  onChange={(e) => setNewItem({ ...newItem, password: e.target.value })}
-                  className="w-full px-3 py-2 text-sm bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
-                  placeholder="Password"
-                />
-                <textarea
-                  value={newItem.code}
-                  onChange={(e) => setNewItem({ ...newItem, code: e.target.value })}
-                  className="col-span-2 w-full px-3 py-2 text-sm bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 font-mono"
-                  placeholder="Code/Key (12 rows supported)"
-                  rows={3}
-                />
-                <input
-                  type="email"
-                  value={newItem.outlookEmail}
-                  onChange={(e) => setNewItem({ ...newItem, outlookEmail: e.target.value })}
-                  className="w-full px-3 py-2 text-sm bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
-                  placeholder="Outlook Email"
-                />
-                <input
-                  type="text"
-                  value={newItem.outlookPassword}
-                  onChange={(e) => setNewItem({ ...newItem, outlookPassword: e.target.value })}
-                  className="w-full px-3 py-2 text-sm bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
-                  placeholder="Outlook Password"
-                />
-                <input
-                  type="text"
-                  value={newItem.birthdate}
-                  onChange={(e) => setNewItem({ ...newItem, birthdate: e.target.value })}
-                  className="w-full px-3 py-2 text-sm bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
-                  placeholder="Birthdate"
-                />
-                <input
-                  type="text"
-                  value={newItem.region}
-                  onChange={(e) => setNewItem({ ...newItem, region: e.target.value })}
-                  className="w-full px-3 py-2 text-sm bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
-                  placeholder="Region"
-                />
-                <input
-                  type="text"
-                  value={newItem.onlineId}
-                  onChange={(e) => setNewItem({ ...newItem, onlineId: e.target.value })}
-                  className="w-full px-3 py-2 text-sm bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
-                  placeholder="Online ID"
-                />
-                <input
-                  type="text"
-                  value={newItem.backupCodes}
-                  onChange={(e) => setNewItem({ ...newItem, backupCodes: e.target.value })}
-                  className="w-full px-3 py-2 text-sm bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
-                  placeholder="Backup Codes"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  className="w-full px-4 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-red-500"
+                  placeholder="Enter product name"
                 />
               </div>
-              <Button onClick={handleAddDigitalItem} className="w-full text-sm py-1" disabled={!newItem.email && !newItem.password && !newItem.code}>
-                Add Item (+)
-              </Button>
-            </div>
-
-            {/* Items List */}
-            {formData.digitalItems.length > 0 && (
-              <div className="max-h-48 overflow-y-auto border border-gray-200 dark:border-gray-700 rounded-lg">
-                <table className="w-full text-sm">
-                  <thead className="bg-gray-50 dark:bg-gray-900 sticky top-0">
-                    <tr>
-                      <th className="text-left py-2 px-3 font-medium text-gray-500 dark:text-gray-400">Main Info</th>
-                      <th className="text-left py-2 px-3 font-medium text-gray-500 dark:text-gray-400">Outlook</th>
-                      <th className="text-left py-2 px-3 font-medium text-gray-500 dark:text-gray-400">Details</th>
-                      <th className="w-10"></th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                    {formData.digitalItems.map((item, index) => (
-                      <tr key={index} className="bg-white dark:bg-gray-800">
-                        <td className="py-2 px-3 text-gray-900 dark:text-gray-300">
-                          <div className="font-medium truncate max-w-[120px]">{item.email}</div>
-                          <div className="text-xs text-gray-500 truncate max-w-[120px]">{item.password}</div>
-                          {item.code && <div className="text-xs font-mono text-gray-400 truncate max-w-[120px]">{item.code}</div>}
-                        </td>
-                        <td className="py-2 px-3 text-gray-900 dark:text-gray-300">
-                           <div className="text-xs truncate max-w-[100px]">{item.outlookEmail}</div>
-                           <div className="text-xs text-gray-500 truncate max-w-[100px]">{item.outlookPassword}</div>
-                        </td>
-                        <td className="py-2 px-3 text-gray-900 dark:text-gray-300">
-                            <div className="text-xs">ID: {item.onlineId}</div>
-                            <div className="text-xs text-gray-500">{item.region}</div>
-                        </td>
-                        <td className="py-2 px-3 text-right">
-                          <button
-                            onClick={() => handleRemoveDigitalItem(index)}
-                            className="text-red-500 hover:text-red-700"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </td>
-                      </tr>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Category</label>
+                  <select
+                    value={formData.category}
+                    onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                    className="w-full px-4 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-red-500"
+                  >
+                    <option value="">Select Category</option>
+                    {categories.map(c => (
+                        <option key={c.id} value={c.name}>{c.name}</option>
                     ))}
-                  </tbody>
-                </table>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Sub Category</label>
+                  <select
+                    value={formData.subCategory}
+                    onChange={(e) => setFormData({ ...formData, subCategory: e.target.value })}
+                    className="w-full px-4 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-red-500"
+                  >
+                    <option value="">Select Sub Category</option>
+                    {(() => {
+                        const cat = categories.find(c => c.name === formData.category);
+                        return cat ? subCategories.filter(s => s.categoryId === cat.id && s.isActive).map(s => (
+                            <option key={s.id} value={s.name}>{s.name}</option>
+                        )) : [];
+                    })()}
+                  </select>
+                </div>
               </div>
-            )}
-            
-            <p className="text-xs text-gray-500 mt-2">
-              Total Digital Stock: {formData.digitalItems.length} items (Stock quantity updated automatically)
-            </p>
-          </div>
-          
-          <div className="flex justify-end gap-3 pt-4">
-            <Button
-              variant="secondary"
-              onClick={() => {
-                setIsAddModalOpen(false);
-                setEditingProduct(null);
-                setFormData({ name: '', category: 'Consoles', price: '', cost: '', stock: 0, image: '', digitalItems: [] });
-              }}
-              className="dark:text-white"
-            >
-              Cancel
-            </Button>
-            <Button onClick={handleSaveProduct} className="dark:text-white">
-              {editingProduct ? 'Update Product' : 'Add Product'}
-            </Button>
-          </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Price ({settings.currency_symbol})</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={formData.price}
+                    onChange={(e) => setFormData({ ...formData, price: parseFloat(e.target.value) || 0 })}
+                    className="w-full px-4 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-red-500"
+                    placeholder="0.00"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Cost ({settings.currency_symbol})</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={formData.cost}
+                    onChange={(e) => setFormData({ ...formData, cost: parseFloat(e.target.value) || 0 })}
+                    className="w-full px-4 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-red-500"
+                    placeholder="0.00"
+                  />
+                </div>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Stock Quantity</label>
+                <input
+                  type="number"
+                  value={formData.stock}
+                  onChange={(e) => setFormData({ ...formData, stock: parseInt(e.target.value) || 0 })}
+                  disabled={formData.digitalItems.length > 0}
+                  className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 ${
+                    formData.digitalItems.length > 0 
+                      ? 'bg-gray-100 dark:bg-gray-800 text-gray-500 cursor-not-allowed border-gray-200 dark:border-gray-700' 
+                      : 'bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white border-gray-200 dark:border-gray-600'
+                  }`}
+                  placeholder="0"
+                />
+                {formData.digitalItems.length > 0 && (
+                  <p className="mt-1 text-xs text-blue-600 dark:text-blue-400">
+                    Stock is automatically calculated from the number of digital items.
+                  </p>
+                )}
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Image URL (optional)</label>
+                <div className="space-y-2">
+                  <input
+                    type="text"
+                    value={formData.image}
+                    onChange={(e) => setFormData({ ...formData, image: e.target.value })}
+                    className="w-full px-4 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-red-500"
+                    placeholder="https://..."
+                  />
+                  <div className="flex items-center gap-2">
+                    <div className="h-px bg-gray-200 dark:bg-gray-700 flex-1"></div>
+                    <span className="text-xs text-gray-500 dark:text-gray-400 font-medium">OR UPLOAD</span>
+                    <div className="h-px bg-gray-200 dark:bg-gray-700 flex-1"></div>
+                  </div>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleFileUpload}
+                    className="w-full text-sm text-gray-500 dark:text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-red-50 file:text-red-700 hover:file:bg-red-100 dark:file:bg-red-900/30 dark:file:text-red-400"
+                  />
+                </div>
+              </div>
+
+              <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                    <span className="px-2 py-0.5 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 text-xs rounded">Admin Only</span>
+                    Digital Stock Items
+                  </h3>
+                  <div className="flex gap-2">
+                    <Button variant="secondary" onClick={handleExportCSVTemplate} className="text-xs py-1 h-8 dark:text-white">
+                      Download Template
+                    </Button>
+                    <label className="cursor-pointer">
+                      <span className="inline-flex items-center justify-center px-3 py-1 text-xs font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors h-8">
+                        Import CSV
+                      </span>
+                      <input type="file" accept=".csv" onChange={handleImportCSV} className="hidden" />
+                    </label>
+                  </div>
+                </div>
+                
+                <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg mb-4">
+                  {/* Main Account Information */}
+                  <div className="mb-4">
+                    <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3 flex items-center">
+                      <span className="w-2 h-2 bg-red-500 rounded-full mr-2"></span>
+                      Main Account Information
+                    </h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">PSN Email</label>
+                        <input
+                          type="email"
+                          value={newItem.email}
+                          onChange={(e) => setNewItem({ ...newItem, email: e.target.value })}
+                          className="w-full px-3 py-2 text-sm bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
+                          placeholder="account@psn.com"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">PSN Password</label>
+                        <input
+                          type="text"
+                          value={newItem.password}
+                          onChange={(e) => setNewItem({ ...newItem, password: e.target.value })}
+                          className="w-full px-3 py-2 text-sm bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
+                          placeholder="Enter PSN password"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Region</label>
+                        <select
+                          value={newItem.region}
+                          onChange={(e) => setNewItem({ ...newItem, region: e.target.value })}
+                          className="w-full px-3 py-2 text-sm bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
+                        >
+                          <option value="">Select Region</option>
+                          <option value="US">US</option>
+                          <option value="EU">EU</option>
+                          <option value="UK">UK</option>
+                          <option value="JP">JP</option>
+                          <option value="ASIA">ASIA</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Online ID</label>
+                        <input
+                          type="text"
+                          value={newItem.onlineId}
+                          onChange={(e) => setNewItem({ ...newItem, onlineId: e.target.value })}
+                          className="w-full px-3 py-2 text-sm bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
+                          placeholder="PSN Online ID"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Recovery Information */}
+                  <div className="mb-4">
+                    <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3 flex items-center">
+                      <span className="w-2 h-2 bg-blue-500 rounded-full mr-2"></span>
+                      Recovery Information
+                    </h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Outlook Email</label>
+                        <input
+                          type="email"
+                          value={newItem.outlookEmail}
+                          onChange={(e) => setNewItem({ ...newItem, outlookEmail: e.target.value })}
+                          className="w-full px-3 py-2 text-sm bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
+                          placeholder="recovery@outlook.com"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Outlook Password</label>
+                        <input
+                          type="text"
+                          value={newItem.outlookPassword}
+                          onChange={(e) => setNewItem({ ...newItem, outlookPassword: e.target.value })}
+                          className="w-full px-3 py-2 text-sm bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
+                          placeholder="Outlook password"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Birthdate</label>
+                        <input
+                          type="date"
+                          value={newItem.birthdate}
+                          onChange={(e) => setNewItem({ ...newItem, birthdate: e.target.value })}
+                          className="w-full px-3 py-2 text-sm bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
+                          placeholder="YYYY-MM-DD"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Game Codes */}
+                  <div className="mb-4">
+                    <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3 flex items-center">
+                      <span className="w-2 h-2 bg-green-500 rounded-full mr-2"></span>
+                      Game Codes & Keys
+                    </h4>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                        Codes/Keys (Enter multiple codes, one per line)
+                      </label>
+                      <textarea
+                        value={newItem.code}
+                        onChange={(e) => setNewItem({ ...newItem, code: e.target.value })}
+                        className="w-full px-3 py-2 text-sm bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 font-mono"
+                        placeholder="GAME-PS4-001&#10;GAME-PS5-002&#10;GAME-SEC-003&#10;GAME-OFF-PS4-004&#10;GAME-OFF-PS5-005&#10;BACKUP-001&#10;BACKUP-002"
+                        rows={6}
+                      />
+                      <div className="text-xs text-gray-500 dark:text-gray-400 mt-2 bg-white dark:bg-gray-700 p-2 rounded border border-gray-200 dark:border-gray-600">
+                        {newItem.code ? (() => {
+                          const codes = newItem.code.split('\n').filter(line => line.trim());
+                          const mainCodes = codes.slice(0, 5);
+                          const backupCodes = codes.slice(5);
+                          return (
+                            <div>
+                              <div className="font-medium text-green-600">✅ {codes.length} code(s) detected</div>
+                              <div className="text-gray-600">
+                                → {mainCodes.length} main slots: Primary PS4, Primary PS5, Secondary, Offline PS4, Offline PS5
+                              </div>
+                              {backupCodes.length > 0 && (
+                                <div className="text-gray-600">
+                                  → {backupCodes.length} backup codes for recovery
+                                </div>
+                              )}
+                              <div className="text-blue-600 mt-1">
+                                📦 Creates {Math.max(5, mainCodes.length)} stock slots
+                              </div>
+                            </div>
+                          );
+                        })() : (
+                          <div>
+                            <div className="text-gray-500">📝 Enter at least one code</div>
+                            <div className="text-gray-400 text-xs mt-1">First 5 codes become main slots, rest become backup codes</div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  <Button onClick={handleAddDigitalItem} className="w-full text-sm py-2 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white font-medium" disabled={!newItem.email && !newItem.password && !newItem.code}>
+                    <span className="flex items-center justify-center">
+                      <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                      </svg>
+                      Add Digital Item (Creates 5 Stock Slots)
+                    </span>
+                  </Button>
+                </div>
+
+                {formData.digitalItems.length > 0 && (
+                  <div className="max-h-48 overflow-y-auto border border-gray-200 dark:border-gray-700 rounded-lg">
+                    <table className="w-full text-sm">
+                      <thead className="bg-gray-50 dark:bg-gray-900 sticky top-0">
+                        <tr>
+                          <th className="text-left py-2 px-3 font-medium text-gray-500 dark:text-gray-400">Main Info</th>
+                          <th className="text-left py-2 px-3 font-medium text-gray-500 dark:text-gray-400">Outlook</th>
+                          <th className="text-left py-2 px-3 font-medium text-gray-500 dark:text-gray-400">Details</th>
+                          <th className="w-10"></th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                        {formData.digitalItems.map((item, index) => (
+                          <tr key={index} className="bg-white dark:bg-gray-800">
+                            <td className="py-2 px-3 text-gray-900 dark:text-gray-300">
+                              <div className="font-medium truncate max-w-[120px]">{item.email}</div>
+                              <div className="text-xs text-gray-500 truncate max-w-[120px]">{item.password}</div>
+                              {item.code && <div className="text-xs font-mono text-gray-400 truncate max-w-[120px]">{item.code}</div>}
+                              {item.totalCodes && item.totalCodes > 1 && (
+                                <div className="text-xs text-blue-500 dark:text-blue-400">+{item.totalCodes - 1} backup codes</div>
+                              )}
+                            </td>
+                            <td className="py-2 px-3 text-gray-900 dark:text-gray-300">
+                               <div className="text-xs truncate max-w-[100px]">{item.outlookEmail}</div>
+                               <div className="text-xs text-gray-500 truncate max-w-[100px]">{item.outlookPassword}</div>
+                            </td>
+                            <td className="py-2 px-3 text-gray-900 dark:text-gray-300">
+                                <div className="text-xs">ID: {item.onlineId}</div>
+                                <div className="text-xs text-gray-500">{item.region}</div>
+                            </td>
+                            <td className="py-2 px-3 text-right">
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveDigitalItem(index)}
+                                className="text-white bg-red-600 hover:bg-red-700 p-1 rounded"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+                
+                <p className="text-xs text-gray-500 mt-2">
+                  Total Digital Stock: {formData.digitalItems.length} items × 5 slots each = {formData.digitalItems.length * 5} total stock
+                </p>
+              </div>
+              
+              <div className="flex justify-end gap-3 pt-4">
+                <Button
+                  variant="secondary"
+                  onClick={() => {
+                    setIsAddModalOpen(false);
+                    setEditingProduct(null);
+                    setFormData({ name: '', category: 'Consoles', price: '', cost: '', stock: 0, image: '', digitalItems: [] });
+                  }}
+                  className="dark:text-white"
+                >
+                  Cancel
+                </Button>
+                <Button onClick={handleSaveProduct} className="dark:text-white">
+                  {editingProduct ? 'Update Product' : 'Add Product'}
+                </Button>
+              </div>
+            </div>
+          </Modal>
         </div>
-      </Modal>
-    </div>
-  );
+      );
+    } catch (error) {
+      console.error('Error rendering Products component:', error);
+      return (
+        <div className="p-6 bg-red-50 border border-red-200 rounded-lg">
+          <h3 className="text-red-800 font-semibold mb-2">Error Loading Products</h3>
+          <p className="text-red-600">There was an error loading the products. Please try refreshing the page.</p>
+        </div>
+      );
+    }
+  };
+
+  return renderContent();
 }

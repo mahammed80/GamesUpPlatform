@@ -2,7 +2,18 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { ArrowRight, Star, TrendingUp, Gamepad2, Headphones, Monitor, Package, ChevronLeft, ChevronRight, Disc, HardDrive, Keyboard, Mouse, Laptop, Smartphone } from 'lucide-react';
 import { publicAnonKey } from '../../utils/supabase/info';
-import { BASE_URL } from '../../utils/api';
+import { BASE_URL, bannersAPI } from '../../utils/api';
+
+interface Banner {
+  id: string | number;
+  title: string;
+  imageUrl: string;
+  link: string;
+  position: number;
+  isActive: boolean;
+  subtitle?: string;
+  badge?: string;
+}
 
 interface LandingPageProps {
   onNavigate: (page: 'shop', productId?: string, categorySlug?: string) => void;
@@ -52,10 +63,13 @@ export function LandingPage({ onNavigate, onOpenCart }: LandingPageProps) {
     ctaPrimary: 'Shop Now',
     ctaSecondary: 'Learn More'
   });
+  const [banners, setBanners] = useState<Banner[]>([]);
+  const [loadingBanners, setLoadingBanners] = useState(true);
 
   useEffect(() => {
     loadCategories();
     loadFeaturedProducts();
+    loadBanners();
     
     // Load saved content
     const loadContent = () => {
@@ -87,7 +101,7 @@ export function LandingPage({ onNavigate, onOpenCart }: LandingPageProps) {
 
   const addToCart = (product: Product | any) => {
     if (product.hasVariants) {
-      onNavigate('product', product.id);
+      onNavigate('shop');
       return;
     }
     const cart = JSON.parse(localStorage.getItem('cart') || '[]');
@@ -141,6 +155,34 @@ export function LandingPage({ onNavigate, onOpenCart }: LandingPageProps) {
       console.error('Error loading products:', error);
     }
   };
+
+  const loadBanners = async () => {
+    try {
+      setLoadingBanners(true);
+      const data = await bannersAPI.getAll();
+      setBanners(data.banners?.filter((b: Banner) => b.isActive) || []);
+    } catch (error) {
+      console.error('Error loading banners:', error);
+    } finally {
+      setLoadingBanners(false);
+    }
+  };
+
+  // Get banner by position (1-6 for different sections)
+  const getBannerByPosition = (position: number) => banners.find((b: Banner) => b.position === position);
+  
+  // Default banner data for fallback
+  const defaultBentoImages = [
+    { src: '/assets/red%20banner%203.jpg', alt: 'Featured Gaming Gear', badge: 'PREMIUM GEAR', title: 'Level Up Your Setup', subtitle: 'Discover our premium collection of gaming peripherals designed for pro players.' },
+    { src: '/assets/red%20consolr.jpg', alt: 'Console Gaming', badge: 'NEW ARRIVALS', title: 'Next-Gen Consoles', subtitle: '' },
+    { src: '/assets/red%20new%20bg.jpg', alt: 'Gaming Experience', badge: 'IMMERSIVE', title: 'Ultimate Experience', subtitle: '' },
+  ];
+  
+  const defaultSecondaryImages = [
+    { src: '/assets/ps%20banner.jpg', alt: 'New Arrivals', title: 'New Arrivals', subtitle: 'Check out the latest gaming gear', icon: Gamepad2, color: 'text-red-500' },
+    { src: '/assets/banner%202.jpg', alt: 'Best Sellers', title: 'Best Sellers', subtitle: 'Top-rated products this month', icon: Star, color: 'text-orange-500' },
+    { src: '/assets/banner%203.jpg', alt: 'Accessories', title: 'Accessories', subtitle: 'Enhance your gaming setup', icon: Headphones, color: 'text-purple-500' },
+  ];
 
 
 
@@ -313,70 +355,99 @@ export function LandingPage({ onNavigate, onOpenCart }: LandingPageProps) {
       {/* Modern Bento Grid Section */}
       <section className="py-16 bg-gray-50">
         <div className="w-full px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 md:grid-cols-2 md:grid-rows-2 gap-4 h-auto md:h-[80vh]">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 h-auto md:h-[35vh]">
             
-            {/* Main Feature - Left (Spans 1 col, 2 rows) */}
+            {/* Main Feature - Left - Position 1 */}
             <motion.div 
               initial={{ opacity: 0, x: -20 }}
               whileInView={{ opacity: 1, x: 0 }}
               viewport={{ once: true }}
-              className="col-span-1 md:row-span-2 relative rounded-2xl overflow-hidden group cursor-pointer h-[40vh] md:h-full"
+              className="col-span-1 relative rounded-2xl overflow-hidden group cursor-pointer h-[40vh] md:h-full"
               onClick={() => onNavigate('shop')}
             >
-              <img 
-                src="/assets/red%20banner%203.jpg" 
-                alt="Featured Gaming Gear" 
-                className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
-              />
-              <div className="absolute inset-0 bg-black/30 group-hover:bg-black/20 transition-colors duration-300" /> {/* Dark overlay */}
-              <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent p-8 flex flex-col justify-end">
-                <span className="text-red-500 font-bold tracking-wider text-sm mb-2">PREMIUM GEAR</span>
-                <h3 className="text-white text-3xl font-bold mb-3">Level Up Your Setup</h3>
-                <p className="text-gray-200 text-base line-clamp-2 max-w-md">Discover our premium collection of gaming peripherals designed for pro players.</p>
-              </div>
+              {(() => {
+                const banner = getBannerByPosition(1);
+                const defaults = defaultBentoImages[0];
+                return (
+                  <>
+                    <img 
+                      src={banner?.imageUrl || defaults.src}
+                      alt={banner?.title || defaults.alt}
+                      className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                    />
+                    <div className="absolute inset-0 bg-black/30 group-hover:bg-black/20 transition-colors duration-300" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent p-8 flex flex-col justify-end">
+                      <span className="text-red-500 font-bold tracking-wider text-sm mb-2">{banner?.badge || defaults.badge}</span>
+                      <h3 className="text-white text-3xl font-bold mb-3">{banner?.title || defaults.title}</h3>
+                      {(banner?.subtitle || defaults.subtitle) && (
+                        <p className="text-gray-200 text-base line-clamp-2 max-w-md">{banner?.subtitle || defaults.subtitle}</p>
+                      )}
+                    </div>
+                  </>
+                );
+              })()}
             </motion.div>
 
-            {/* Secondary Feature - Top Right (Spans 1 col, 1 row) */}
-            <motion.div 
-              initial={{ opacity: 0, y: -20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: 0.1 }}
-              className="col-span-1 md:row-span-1 relative rounded-2xl overflow-hidden group cursor-pointer h-[40vh] md:h-auto"
-              onClick={() => onNavigate('shop')}
-            >
-              <img 
-                src="/assets/red%20consolr.jpg" 
-                alt="Console Gaming" 
-                className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
-              />
-              <div className="absolute inset-0 bg-black/30 group-hover:bg-black/20 transition-colors duration-300" /> {/* Dark overlay */}
-              <div className="absolute inset-0 bg-gradient-to-r from-black/90 via-black/20 to-transparent p-8 flex flex-col justify-center">
-                <span className="text-red-500 font-bold tracking-wider text-sm mb-2">NEW ARRIVALS</span>
-                <h3 className="text-white text-3xl font-bold">Next-Gen Consoles</h3>
-              </div>
-            </motion.div>
+            {/* Right Side - Stacked Banners */}
+            <div className="col-span-1 flex flex-col gap-4 h-[80vh] md:h-full">
+              {/* Secondary Feature - Top Right - Position 2 */}
+              <motion.div 
+                initial={{ opacity: 0, y: -20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: 0.1 }}
+                className="relative rounded-2xl overflow-hidden group cursor-pointer flex-1 h-[40vh] md:h-auto"
+                onClick={() => onNavigate('shop')}
+              >
+                {(() => {
+                  const banner = getBannerByPosition(2);
+                  const defaults = defaultBentoImages[1];
+                  return (
+                    <>
+                      <img 
+                        src={banner?.imageUrl || defaults.src}
+                        alt={banner?.title || defaults.alt}
+                        className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                      />
+                      <div className="absolute inset-0 bg-black/30 group-hover:bg-black/20 transition-colors duration-300" />
+                      <div className="absolute inset-0 bg-gradient-to-r from-black/90 via-black/20 to-transparent p-8 flex flex-col justify-center">
+                        <span className="text-red-500 font-bold tracking-wider text-sm mb-2">{banner?.badge || defaults.badge}</span>
+                        <h3 className="text-white text-3xl font-bold">{banner?.title || defaults.title}</h3>
+                      </div>
+                    </>
+                  );
+                })()}
+              </motion.div>
 
-            {/* Third Feature - Bottom Right (Spans 1 col, 1 row) */}
-            <motion.div 
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: 0.2 }}
-              className="col-span-1 md:row-span-1 relative rounded-2xl overflow-hidden group cursor-pointer h-[40vh] md:h-auto"
-              onClick={() => onNavigate('shop')}
-            >
-              <img 
-                src="/assets/red%20new%20bg.jpg" 
-                alt="Gaming Experience" 
-                className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
-              />
-              <div className="absolute inset-0 bg-black/30 group-hover:bg-black/20 transition-colors duration-300" /> {/* Dark overlay */}
-              <div className="absolute inset-0 bg-gradient-to-r from-black/90 via-black/20 to-transparent p-8 flex flex-col justify-center">
-                <span className="text-red-500 font-bold tracking-wider text-sm mb-2">IMMERSIVE</span>
-                <h3 className="text-white text-3xl font-bold">Ultimate Experience</h3>
-              </div>
-            </motion.div>
+              {/* Third Feature - Bottom Right - Position 3 */}
+              <motion.div 
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: 0.2 }}
+                className="relative rounded-2xl overflow-hidden group cursor-pointer flex-1 h-[40vh] md:h-auto"
+                onClick={() => onNavigate('shop')}
+              >
+                {(() => {
+                  const banner = getBannerByPosition(3);
+                  const defaults = defaultBentoImages[2];
+                  return (
+                    <>
+                      <img 
+                        src={banner?.imageUrl || defaults.src}
+                        alt={banner?.title || defaults.alt}
+                        className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                      />
+                      <div className="absolute inset-0 bg-black/30 group-hover:bg-black/20 transition-colors duration-300" />
+                      <div className="absolute inset-0 bg-gradient-to-r from-black/90 via-black/20 to-transparent p-8 flex flex-col justify-center">
+                        <span className="text-red-500 font-bold tracking-wider text-sm mb-2">{banner?.badge || defaults.badge}</span>
+                        <h3 className="text-white text-3xl font-bold">{banner?.title || defaults.title}</h3>
+                      </div>
+                    </>
+                  );
+                })()}
+              </motion.div>
+            </div>
           </div>
         </div>
       </section>
@@ -487,72 +558,43 @@ export function LandingPage({ onNavigate, onOpenCart }: LandingPageProps) {
         </div>
       </section>
 
-      {/* Secondary Banner */}
+      {/* Secondary Banner - Dynamic with Positions 4, 5, 6 */}
       <section className="py-16 bg-gray-900">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <motion.div
-              whileHover={{ scale: 1.02 }}
-              className="relative rounded-2xl p-8 text-white overflow-hidden group"
-            >
-              <img 
-                src="/assets/ps%20banner.jpg" 
-                alt="New Arrivals" 
-                className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
-              />
-              <div className="absolute inset-0 bg-black/60 group-hover:bg-black/50 transition-colors" />
+            {[4, 5, 6].map((position, index) => {
+              const banner = getBannerByPosition(position);
+              const defaults = defaultSecondaryImages[index];
+              const Icon = defaults.icon;
               
-              <div className="relative z-10">
-                <Gamepad2 className="w-12 h-12 mb-4 text-red-500" />
-                <h3 className="text-2xl font-bold mb-2">New Arrivals</h3>
-                <p className="text-gray-200 mb-4">Check out the latest gaming gear</p>
-                <button className="text-white font-semibold underline hover:no-underline hover:text-red-400 transition-colors">
-                  Shop Now →
-                </button>
-              </div>
-            </motion.div>
-
-            <motion.div
-              whileHover={{ scale: 1.02 }}
-              className="relative rounded-2xl p-8 text-white overflow-hidden group"
-            >
-              <img 
-                src="/assets/banner%202.jpg" 
-                alt="Best Sellers" 
-                className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
-              />
-              <div className="absolute inset-0 bg-black/60 group-hover:bg-black/50 transition-colors" />
-              
-              <div className="relative z-10">
-                <Star className="w-12 h-12 mb-4 text-orange-500" />
-                <h3 className="text-2xl font-bold mb-2">Best Sellers</h3>
-                <p className="text-gray-200 mb-4">Top-rated products this month</p>
-                <button className="text-white font-semibold underline hover:no-underline hover:text-orange-400 transition-colors">
-                  View All →
-                </button>
-              </div>
-            </motion.div>
-
-            <motion.div
-              whileHover={{ scale: 1.02 }}
-              className="relative rounded-2xl p-8 text-white overflow-hidden group"
-            >
-              <img 
-                src="/assets/banner%203.jpg" 
-                alt="Accessories" 
-                className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
-              />
-              <div className="absolute inset-0 bg-black/60 group-hover:bg-black/50 transition-colors" />
-              
-              <div className="relative z-10">
-                <Headphones className="w-12 h-12 mb-4 text-purple-500" />
-                <h3 className="text-2xl font-bold mb-2">Accessories</h3>
-                <p className="text-gray-200 mb-4">Enhance your gaming setup</p>
-                <button className="text-white font-semibold underline hover:no-underline hover:text-purple-400 transition-colors">
-                  Explore →
-                </button>
-              </div>
-            </motion.div>
+              return (
+                <motion.div
+                  key={position}
+                  whileHover={{ scale: 1.02 }}
+                  className="relative rounded-2xl p-8 text-white overflow-hidden group cursor-pointer"
+                  onClick={() => banner?.link ? window.open(banner.link, '_blank') : onNavigate('shop')}
+                >
+                  <img 
+                    src={banner?.imageUrl || defaults.src}
+                    alt={banner?.title || defaults.alt}
+                    className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                    onError={(e: any) => {
+                      (e.target as HTMLImageElement).src = defaults.src;
+                    }}
+                  />
+                  <div className="absolute inset-0 bg-black/60 group-hover:bg-black/50 transition-colors" />
+                  
+                  <div className="relative z-10">
+                    <Icon className={`w-12 h-12 mb-4 ${defaults.color}`} />
+                    <h3 className="text-2xl font-bold mb-2">{banner?.title || defaults.title}</h3>
+                    <p className="text-gray-200 mb-4">{banner?.subtitle || defaults.subtitle}</p>
+                    <button className="text-white font-semibold underline hover:no-underline hover:text-red-400 transition-colors">
+                      {banner?.link ? 'Learn More →' : 'Shop Now →'}
+                    </button>
+                  </div>
+                </motion.div>
+              );
+            })}
           </div>
         </div>
       </section>

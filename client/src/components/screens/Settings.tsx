@@ -1,13 +1,14 @@
 import { useState, useEffect } from 'react';
 import { Card } from '../ui/card';
 import { Button } from '../ui/button';
-import { Save, Eye, EyeOff } from 'lucide-react';
+import { Save, Eye, EyeOff, CheckCircle } from 'lucide-react';
 import { useStoreSettings } from '../../context/StoreSettingsContext';
 import { BASE_URL, authAPI } from '../../utils/api';
 
 export function Settings() {
   const { settings, updateSettings } = useStoreSettings();
   const [activeTab, setActiveTab] = useState('store');
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   
   // Local state for password change
   const [passwordForm, setPasswordForm] = useState({
@@ -98,11 +99,16 @@ export function Settings() {
   }, [settings]);
 
   const handleSave = async () => {
+    setSaveStatus('saving');
     try {
       await updateSettings(formData);
-      alert('Settings saved successfully!');
+      setSaveStatus('saved');
+      // Reset to idle after 3 seconds
+      setTimeout(() => setSaveStatus('idle'), 3000);
     } catch (error) {
-      alert('Failed to save settings');
+      setSaveStatus('error');
+      // Reset to idle after 3 seconds
+      setTimeout(() => setSaveStatus('idle'), 3000);
     }
   };
 
@@ -188,8 +194,8 @@ export function Settings() {
               onClick={() => setActiveTab(tab.id)}
               className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
                 activeTab === tab.id
-                  ? 'border-red-600 text-red-600 dark:text-red-400'
-                  : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+                  ? 'border-red-600 text-white'
+                  : 'border-transparent text-white hover:text-red-300'
               }`}
             >
               {tab.label}
@@ -575,9 +581,32 @@ export function Settings() {
 
       {/* Save Button */}
       <div className="flex justify-end">
-        <Button onClick={handleSave} className="bg-red-600 hover:bg-red-700 text-white">
-          <Save className="w-4 h-4 mr-2" />
-          Save Changes
+        <Button 
+          onClick={handleSave} 
+          className="bg-red-600 hover:bg-red-700 text-white relative"
+          disabled={saveStatus === 'saving'}
+        >
+          {saveStatus === 'saving' ? (
+            <>
+              <div className="w-4 h-4 mr-2 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+              Saving...
+            </>
+          ) : saveStatus === 'saved' ? (
+            <>
+              <CheckCircle className="w-4 h-4 mr-2" />
+              Saved!
+            </>
+          ) : saveStatus === 'error' ? (
+            <>
+              <Save className="w-4 h-4 mr-2" />
+              Try Again
+            </>
+          ) : (
+            <>
+              <Save className="w-4 h-4 mr-2" />
+              Save Changes
+            </>
+          )}
         </Button>
       </div>
     </div>

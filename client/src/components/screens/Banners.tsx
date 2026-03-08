@@ -1,9 +1,9 @@
-import { useState, useEffect } from 'react';
-import { Plus, Edit, Trash2, Eye, EyeOff } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { Plus, Edit, Trash2, Eye, EyeOff, Upload } from 'lucide-react';
 import { Card } from '../ui/card';
 import { Button } from '../ui/button';
 import { Modal } from '../ui/Modal';
-import { bannersAPI } from '../../utils/api';
+import { bannersAPI, uploadAPI } from '../../utils/api';
 
 interface Banner {
   id: string | number;
@@ -32,6 +32,8 @@ export function Banners() {
     startDate: '',
     endDate: '',
   });
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [heroConfig, setHeroConfig] = useState({
     badge: '🎮 Your Ultimate Gaming Destination',
@@ -140,6 +142,39 @@ export function Banners() {
       endDate: banner.endDate || '',
     });
     setIsAddModalOpen(true);
+  };
+
+  const handleFileUpload = async (e: any) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      alert('Please select an image file');
+      return;
+    }
+
+    // Validate file size (5MB max)
+    if (file.size > 5 * 1024 * 1024) {
+      alert('File size must be less than 5MB');
+      return;
+    }
+
+    try {
+      setUploading(true);
+      const result = await uploadAPI.uploadImage(file);
+      setFormData({ ...formData, imageUrl: result.url });
+      alert('Image uploaded successfully!');
+    } catch (error: any) {
+      console.error('Upload error:', error);
+      alert('Failed to upload image: ' + error.message);
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const triggerFileInput = () => {
+    fileInputRef.current?.click();
   };
 
   if (loading) {
@@ -378,14 +413,45 @@ export function Banners() {
           </div>
           
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Image URL</label>
-            <input
-              type="text"
-              value={formData.imageUrl}
-              onChange={(e) => setFormData({ ...formData, imageUrl: e.target.value })}
-              className="w-full px-4 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-red-500"
-              placeholder="https://..."
-            />
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Image</label>
+            <div className="space-y-2">
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={formData.imageUrl}
+                  onChange={(e) => setFormData({ ...formData, imageUrl: e.target.value })}
+                  className="flex-1 px-4 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-red-500"
+                  placeholder="https://... or /uploads/filename.jpg"
+                />
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleFileUpload}
+                  className="hidden"
+                />
+                <Button
+                  onClick={triggerFileInput}
+                  disabled={uploading}
+                  variant="secondary"
+                  icon={Upload}
+                >
+                  {uploading ? 'Uploading...' : 'Upload'}
+                </Button>
+              </div>
+              {formData.imageUrl && (
+                <div className="relative rounded-lg overflow-hidden bg-gray-100 dark:bg-gray-700 h-32">
+                  <img
+                    src={formData.imageUrl}
+                    alt="Preview"
+                    className="w-full h-full object-cover"
+                    onError={(e: any) => {
+                      (e.target as HTMLImageElement).style.display = 'none';
+                    }}
+                  />
+                </div>
+              )}
+            </div>
           </div>
 
           <div>
@@ -401,14 +467,21 @@ export function Banners() {
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Position</label>
-              <input
-                type="number"
-                min="1"
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Position (Landing Page Section)</label>
+              <select
                 value={formData.position}
                 onChange={(e) => setFormData({ ...formData, position: parseInt(e.target.value) || 1 })}
                 className="w-full px-4 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-red-500"
-              />
+              >
+                <option value={1}>1 - Bento Grid Main (Left)</option>
+                <option value={2}>2 - Bento Grid Top Right</option>
+                <option value={3}>3 - Bento Grid Bottom Right</option>
+                <option value={4}>4 - Secondary Banner 1</option>
+                <option value={5}>5 - Secondary Banner 2</option>
+                <option value={6}>6 - Secondary Banner 3</option>
+                <option value={7}>7+ - Other Pages</option>
+              </select>
+              <p className="text-xs text-gray-500 mt-1">Positions 1-6 control the Landing Page banners</p>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Status</label>
