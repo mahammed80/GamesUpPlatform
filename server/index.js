@@ -218,10 +218,11 @@ const isProduction = process.env.NODE_ENV === 'production' || process.env.DB_HOS
 let dbHost = process.env.DB_HOST || 'localhost';
 
 // HOSTINGER FIX: Force 'localhost' if '127.0.0.1' is specified
-if (dbHost === '127.0.0.1') {
-  console.log('⚠️  Converting DB_HOST 127.0.0.1 to localhost for Hostinger compatibility');
-  dbHost = 'localhost';
-}
+// REMOVED: We want to allow explicit 127.0.0.1 to force TCP if needed
+// if (dbHost === '127.0.0.1') {
+//   console.log('⚠️  Converting DB_HOST 127.0.0.1 to localhost for Hostinger compatibility');
+//   dbHost = 'localhost';
+// }
 
 // Auto-detect MySQL Socket on Hostinger/Linux
 const socketPaths = [
@@ -234,7 +235,8 @@ const socketPaths = [
 let socketPath = process.env.DB_SOCKET_PATH;
 
 try {
-  if (!socketPath && (dbHost === 'localhost' || dbHost === '127.0.0.1') && process.platform !== 'win32') {
+  // Only try to use socket if we are strictly 'localhost' (not 127.0.0.1) and on Linux
+  if (!socketPath && (dbHost === 'localhost') && process.platform !== 'win32') {
     // 1. Try to find existing socket
     for (const path of socketPaths) {
       if (fs.existsSync(path)) {
