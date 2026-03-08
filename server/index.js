@@ -497,6 +497,66 @@ app.get('/db-check', async (req, res) => {
   }
 });
 
+// Diagnostic Endpoint for Credential Verification
+app.get('/debug-db', async (req, res) => {
+    const mysql = require('mysql2/promise');
+    const results = [];
+    
+    const configs = [
+        {
+            name: 'Env Config',
+            config: {
+                host: process.env.DB_HOST,
+                user: process.env.DB_USER,
+                password: process.env.DB_PASSWORD,
+                database: process.env.DB_NAME,
+                port: process.env.DB_PORT || 3306
+            }
+        },
+        {
+            name: 'Localhost (Socket)',
+            config: {
+                host: 'localhost',
+                user: 'u268537024_games',
+                password: 'Tal1985#',
+                database: 'u268537024_games',
+                socketPath: '/var/lib/mysql/mysql.sock'
+            }
+        },
+        {
+            name: '127.0.0.1 (TCP)',
+            config: {
+                host: '127.0.0.1',
+                user: 'u268537024_games',
+                password: 'Tal1985#',
+                database: 'u268537024_games',
+                port: 3306
+            }
+        }
+    ];
+
+    for (const item of configs) {
+        try {
+            const conn = await mysql.createConnection(item.config);
+            await conn.end();
+            results.push({ name: item.name, status: 'success' });
+        } catch (err) {
+            results.push({ name: item.name, status: 'failed', error: err.message, code: err.code });
+        }
+    }
+    
+    res.json({
+        env: {
+            DB_HOST: process.env.DB_HOST,
+            DB_USER: process.env.DB_USER,
+            DB_PASS_LEN: process.env.DB_PASSWORD ? process.env.DB_PASSWORD.length : 0,
+            DB_PASS_QUOTED: process.env.DB_PASSWORD && (process.env.DB_PASSWORD.startsWith('"') || process.env.DB_PASSWORD.startsWith("'")),
+            NODE_ENV: process.env.NODE_ENV
+        },
+        tests: results
+    });
+});
+
 // Emergency Schema Fix Route
 app.get('/fix-db-schema', async (req, res) => {
   try {
