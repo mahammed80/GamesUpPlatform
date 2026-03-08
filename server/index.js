@@ -518,7 +518,7 @@ app.get('/debug-db', async (req, res) => {
             config: {
                 host: 'localhost',
                 user: 'u268537024_games',
-                password: 'Tal1985#',
+                password: 'Talat$1985',
                 database: 'u268537024_games',
                 socketPath: '/var/lib/mysql/mysql.sock'
             }
@@ -528,7 +528,7 @@ app.get('/debug-db', async (req, res) => {
             config: {
                 host: '127.0.0.1',
                 user: 'u268537024_games',
-                password: 'Tal1985#',
+                password: 'Talat$1985',
                 database: 'u268537024_games',
                 port: 3306
             }
