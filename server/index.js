@@ -218,11 +218,13 @@ const isProduction = process.env.NODE_ENV === 'production' || process.env.DB_HOS
 let dbHost = process.env.DB_HOST || 'localhost';
 
 // HOSTINGER FIX: Force 'localhost' if '127.0.0.1' is specified
-// REMOVED: We want to allow explicit 127.0.0.1 to force TCP if needed
-// if (dbHost === '127.0.0.1') {
-//   console.log('⚠️  Converting DB_HOST 127.0.0.1 to localhost for Hostinger compatibility');
-//   dbHost = 'localhost';
-// }
+// Hostinger Shared Hosting (and cPanel) often restricts '127.0.0.1' TCP access for local users
+// They MUST use 'localhost' which maps to the local Unix socket.
+// The user provided config explicitly has 127.0.0.1, but we need to override it here to ensure socket usage.
+if (dbHost === '127.0.0.1') {
+  console.log('⚠️  Converting DB_HOST 127.0.0.1 to localhost for Hostinger compatibility');
+  dbHost = 'localhost';
+}
 
 // Auto-detect MySQL Socket on Hostinger/Linux
 const socketPaths = [
